@@ -1,0 +1,5 @@
+{
+  "name": "Ziyarath - Islamic Heritage & Maqams Guide",
+  "description": "Explore sacred shrines, maqams, and heritage sites with historical insights, visitor guidelines, and interactive directory.",
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

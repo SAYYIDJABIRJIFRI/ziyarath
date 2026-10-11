@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ziyarath-09",
+  "compatibility_date": "2025-09-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "src/server.ts",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ziyarath-requests",
+      "database_id": "40b7b31a-48fb-402d-b172-6436f2e5053a",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

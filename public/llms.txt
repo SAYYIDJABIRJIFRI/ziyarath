@@ -1,0 +1,19 @@
+# Ziyarath
+
+> A modern Islamic heritage discovery platform — mosques, dargahs, scholars, and sacred places of Kerala, India and the world.
+
+Ziyarath curates researched articles, place profiles, and uroos (annual commemoration) records to help visitors explore Islamic heritage across the Malabar coast and beyond.
+
+## Pages
+
+- [Home](/): Overview of Ziyarath and featured heritage places.
+- [About](/about): The mission and story behind Ziyarath.
+- [Maqams](/maqam): Directory of dargahs and maqams with details, location and history.
+- [Uroos](/uroos): Hijri-calendar listing of uroos days and associated scholars.
+- [Blog](/blog): Articles on Islamic history, sacred places and heritage.
+- [Contact](/contact): Get in touch with the Ziyarath team.
+- [Privacy](/privacy): Privacy policy.
+
+## Optional
+
+- [Sitemap](/sitemap.xml): Full list of indexable URLs.
