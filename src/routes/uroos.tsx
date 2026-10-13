@@ -965,16 +965,21 @@ function TimelineView({
 }
 
 function RegionDot({ region }: { region: Region }) {
+  const isK = region === "kerala";
+  const isI = region === "india";
+  const isME = region === "middle-east";
   return (
     <span
-      title={region === "kerala" ? "Kerala" : region === "india" ? "Rest of India" : "Worldwide"}
+      title={REGION_LABELS[region] || "Worldwide"}
       className={cn(
         "mt-1 h-2 w-2 shrink-0 rounded-full",
-        region === "kerala"
+        isK
           ? "bg-primary"
-          : region === "india"
+          : isI
           ? "bg-emerald-500"
-          : "bg-[var(--gold,oklch(0.78_0.14_85))]",
+          : isME
+          ? "bg-amber-500"
+          : "bg-sky-500",
       )}
     />
   );
