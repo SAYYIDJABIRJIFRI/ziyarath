@@ -469,7 +469,7 @@ export const ALL_DEDICATED_UROOS: DbUroos[] = [
     city: "Cairo",
     state: "Cairo Governorate",
     country: "Egypt",
-    region: "worldwide",
+    region: "middle-east",
     description:
       "Commemorating the encyclopedic Hadith master, Quran commentator, and polymath Imam al-Suyuti, author of Tafsir al-Jalalayn, al-Itqan fi Ulum al-Qur'an, and hundreds of classical Islamic texts.",
     history:
@@ -709,7 +709,7 @@ export const ALL_DEDICATED_UROOS: DbUroos[] = [
     city: "Makkah al-Mukarramah",
     state: "Makkah Province",
     country: "Saudi Arabia",
-    region: "worldwide",
+    region: "middle-east",
     description:
       "Annual commemoration honoring the supreme Shafi'i legal authority and author of Tuhfat al-Muhtaj, revered by Islamic scholars across Kerala and the Muslim world.",
     history:
@@ -908,7 +908,7 @@ export const ALL_DEDICATED_UROOS: DbUroos[] = [
     city: "Basra",
     state: "Basra Governorate",
     country: "Iraq",
-    region: "worldwide",
+    region: "middle-east",
     description:
       "Honoring the legendary Hadith jurist and compiler of Sunan Abi Dawud, revered for ethical jurisprudence, piety, and compiling the fundamental legal Sunnahs.",
     history:

@@ -35,13 +35,15 @@ import {
   Calendar,
   ArrowRight,
   Plus,
+  Compass,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RequestDialog } from "@/components/site/RequestDialog";
+import { REGION_LABELS, type MaqamRegion } from "@/data/maqams";
 
 /* ---------- Search Schema ---------- */
 
-const uroosRegionEnum = z.enum(["all", "kerala", "india", "worldwide"]);
+const uroosRegionEnum = z.enum(["all", "kerala", "india", "middle-east", "worldwide"]);
 const uroosViewEnum = z.enum(["featured", "grid", "timeline"]);
 const uroosConnEnum = z.enum(["all", "connected", "standalone"]);
 
@@ -154,7 +156,44 @@ const INDIA_KEYWORDS = [
   "മുംബൈ",
 ];
 
-export type Region = "kerala" | "india" | "worldwide";
+const MIDDLE_EAST_KEYWORDS = [
+  "ഈജിപ്ത്",
+  "ഇറാഖ്",
+  "ബസ്വറ",
+  "മക്ക",
+  "മദീന",
+  "ബഗ്ദാദ്",
+  "സിറിയ",
+  "യമൻ",
+  "സൗദി",
+  "തുർക്കി",
+  "കൂഫ",
+  "ഖുദ്സ്",
+];
+
+export type Region = MaqamRegion;
+
+export function getUroosRegion(u: DbUroos): Region {
+  if (u.region) return u.region;
+  if (u.state?.toLowerCase() === "kerala") return "kerala";
+  if (u.country?.toLowerCase() === "india") return "india";
+  const meCountries = [
+    "saudi arabia",
+    "uae",
+    "iraq",
+    "syria",
+    "egypt",
+    "yemen",
+    "oman",
+    "qatar",
+    "kuwait",
+    "turkey",
+    "jordan",
+    "palestine",
+  ];
+  if (meCountries.includes(u.country?.toLowerCase() || "")) return "middle-east";
+  return "worldwide";
+}
 
 function classifyRegion(text: string, pageId?: string): Region {
   if (pageId) {
@@ -163,6 +202,7 @@ function classifyRegion(text: string, pageId?: string): Region {
   }
   if (KERALA_KEYWORDS.some((k) => text.includes(k))) return "kerala";
   if (INDIA_KEYWORDS.some((k) => text.includes(k))) return "india";
+  if (MIDDLE_EAST_KEYWORDS.some((k) => text.includes(k))) return "middle-east";
   return "worldwide";
 }
 
@@ -248,6 +288,7 @@ function UroosPage() {
   const totalEntries = all.length;
   const keralaCount = all.filter((e) => e.region === "kerala").length;
   const indiaCount = all.filter((e) => e.region === "india").length;
+  const middleEastCount = all.filter((e) => e.region === "middle-east").length;
   const worldCount = all.filter((e) => e.region === "worldwide").length;
 
   const filteredDynamic = useMemo(() => {
@@ -256,7 +297,7 @@ function UroosPage() {
       if (connFilter === "connected" && (u.isStandalone || !u.maqamId)) return false;
       if (connFilter === "standalone" && (!u.isStandalone && u.maqamId)) return false;
       if (region !== "all") {
-        const uReg = u.region || (u.state?.toLowerCase() === "kerala" ? "kerala" : "worldwide");
+        const uReg = getUroosRegion(u);
         if (uReg !== region) return false;
       }
       if (active !== "all" && u.hijriMonth !== active) return false;
@@ -447,8 +488,15 @@ function UroosPage() {
                   active={region === "india"}
                   onClick={() => updateSearch({ region: "india" })}
                   icon={<MapPin className="h-3.5 w-3.5" />}
-                  label="Rest of India"
+                  label="India"
                   count={indiaCount}
+                />
+                <RegionChip
+                  active={region === "middle-east"}
+                  onClick={() => updateSearch({ region: "middle-east" })}
+                  icon={<Compass className="h-3.5 w-3.5" />}
+                  label="Middle East"
+                  count={middleEastCount}
                 />
                 <RegionChip
                   active={region === "worldwide"}
@@ -478,13 +526,7 @@ function UroosPage() {
                 {region !== "all" && (
                   <FilterPill
                     onClear={() => updateSearch({ region: "all" })}
-                    label={
-                      region === "kerala"
-                        ? "Kerala"
-                        : region === "india"
-                        ? "Rest of India"
-                        : "Worldwide"
-                    }
+                    label={`Region: ${REGION_LABELS[region] || region}`}
                   />
                 )}
                 {query && (
@@ -551,6 +593,8 @@ function UroosPage() {
             connFilter={connFilter}
             setConnFilter={(c) => updateSearch({ conn: c })}
             query={query}
+            region={region}
+            onResetRegion={() => updateSearch({ region: "all", conn: "all", q: "" })}
           />
         ) : filtered.length === 0 ? (
           <EmptyState
@@ -660,18 +704,22 @@ function RegionChip({
     <button
       onClick={onClick}
       className={cn(
-        "inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium transition-all",
+        "group inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium transition-all duration-200 cursor-pointer select-none",
         active
-          ? "border-primary bg-primary text-primary-foreground shadow-sm font-semibold"
-          : "border-border bg-card hover:border-primary/40 hover:text-primary",
+          ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/25 font-semibold scale-[1.02]"
+          : "border-border bg-card/90 backdrop-blur text-foreground hover:border-primary/40 hover:bg-accent hover:text-primary",
       )}
     >
-      {icon}
+      <span className={cn("transition-transform duration-200 group-hover:scale-110", active && "scale-110")}>
+        {icon}
+      </span>
       <span>{label}</span>
       <span
         className={cn(
-          "rounded-full px-1.5 py-0.5 text-[10px] tabular-nums",
-          active ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground",
+          "rounded-full px-2 py-0.5 text-[10px] tabular-nums font-mono transition-colors",
+          active
+            ? "bg-primary-foreground/20 text-primary-foreground"
+            : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary",
         )}
       >
         {count}
@@ -935,26 +983,31 @@ function RegionDot({ region }: { region: Region }) {
 function RegionBadge({ region }: { region: Region }) {
   const isK = region === "kerala";
   const isI = region === "india";
+  const isME = region === "middle-east";
   return (
     <Badge
       variant="outline"
       className={cn(
-        "gap-1 text-[10px]",
+        "gap-1 text-[10px] font-medium transition-colors shadow-xs",
         isK
           ? "border-primary/40 text-primary bg-primary/5"
           : isI
           ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5"
-          : "border-[var(--gold)]/40 text-[var(--gold,oklch(0.78_0.14_85))] bg-amber-500/5",
+          : isME
+          ? "border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/5"
+          : "border-sky-500/40 text-sky-600 dark:text-sky-400 bg-sky-500/5",
       )}
     >
       {isK ? (
-        <Building2 className="h-2.5 w-2.5" />
+        <Building2 className="h-2.5 w-2.5 shrink-0" />
       ) : isI ? (
-        <MapPin className="h-2.5 w-2.5" />
+        <MapPin className="h-2.5 w-2.5 shrink-0" />
+      ) : isME ? (
+        <Compass className="h-2.5 w-2.5 shrink-0" />
       ) : (
-        <Globe2 className="h-2.5 w-2.5" />
+        <Globe2 className="h-2.5 w-2.5 shrink-0" />
       )}
-      {isK ? "Kerala" : isI ? "Rest of India" : "Worldwide"}
+      {REGION_LABELS[region] || "Worldwide"}
     </Badge>
   );
 }
@@ -964,11 +1017,15 @@ function FeaturedUroosView({
   connFilter,
   setConnFilter,
   query,
+  region,
+  onResetRegion,
 }: {
   uroosList: DbUroos[];
   connFilter: "all" | "connected" | "standalone";
   setConnFilter: (f: "all" | "connected" | "standalone") => void;
   query: string;
+  region: z.infer<typeof uroosRegionEnum>;
+  onResetRegion: () => void;
 }) {
   return (
     <div className="space-y-6">
@@ -1009,15 +1066,41 @@ function FeaturedUroosView({
       </div>
 
       {uroosList.length === 0 ? (
-        <div className="text-center py-12 border border-dashed border-border rounded-2xl">
+        <div className="text-center py-12 px-4 border border-dashed border-border rounded-2xl bg-card/40 backdrop-blur-sm">
           <Calendar className="mx-auto h-8 w-8 text-muted-foreground opacity-50" />
-          <h3 className="mt-2 text-base font-semibold">No Uroos entries match your selection</h3>
-          <p className="text-xs text-muted-foreground mt-1">Try switching region or clearing your search.</p>
+          <h3 className="mt-2 text-base font-semibold">No dedicated Uroos pages found</h3>
+          <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+            {region !== "all" && region in REGION_LABELS
+              ? `Currently showing zero dedicated pages in ${REGION_LABELS[region as MaqamRegion]}. You can suggest one or switch back to All Regions.`
+              : "Try adjusting your filters or search keywords."}
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onResetRegion}
+            >
+              Show all regions
+            </Button>
+            <RequestDialog
+              type="uroos"
+              title="Suggest an Uroos Page"
+              description="Missing an uroos date or page? Send us the details and we will review and publish it."
+              subjectPlaceholder="e.g. Uroos celebration of saint in Cairo, Egypt"
+              detailsPlaceholder="City, country, resting person, Hijri date, significance…"
+              trigger={
+                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-sm">
+                  <Plus className="h-3.5 w-3.5" />
+                  Suggest Uroos
+                </Button>
+              }
+            />
+          </div>
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {uroosList.map((u) => {
-            const uRegion = (u.region || (u.state?.toLowerCase() === "kerala" ? "kerala" : "worldwide")) as Region;
+            const uRegion = getUroosRegion(u);
             return (
               <Card
                 key={u.id}
@@ -1179,13 +1262,7 @@ function EntryDialog({
               <MetaRow
                 icon={<MapPin className="h-4 w-4" />}
                 label="Region"
-                value={
-                  entry.region === "kerala"
-                    ? "Kerala"
-                    : entry.region === "india"
-                    ? "Rest of India"
-                    : "Worldwide"
-                }
+                value={REGION_LABELS[entry.region] || "Worldwide"}
               />
               <MetaRow
                 icon={<Hash className="h-4 w-4" />}
@@ -1251,17 +1328,32 @@ function MetaRow({
 
 function EmptyState({ onReset }: { onReset: () => void }) {
   return (
-    <div className="text-center py-16">
-      <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-muted">
+    <div className="text-center py-16 px-4">
+      <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-muted/80 ring-1 ring-border shadow-inner">
         <Search className="h-6 w-6 text-muted-foreground" />
       </div>
-      <h3 className="font-display text-xl font-semibold">No results found</h3>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Try a different search or browse all months and regions.
+      <h3 className="font-display text-xl font-semibold">No matching Uroos events</h3>
+      <p className="mt-1 text-sm text-muted-foreground max-w-md mx-auto">
+        We couldn&apos;t find any festival dates matching your current filter combination.
       </p>
-      <Button onClick={onReset} variant="outline" className="mt-5">
-        Reset filters
-      </Button>
+      <div className="mt-5 flex flex-wrap justify-center gap-2.5">
+        <Button onClick={onReset} variant="outline" className="h-9">
+          Reset all filters
+        </Button>
+        <RequestDialog
+          type="uroos"
+          title="Request an Uroos date"
+          description="Missing an uroos date or page? Send us the Hijri date and details of the mahan — we'll review and create the page."
+          subjectPlaceholder="ഉദാ. റജബ് 6 — ഖാജാ മുഈനുദ്ദീൻ (റ), അജ്മീർ"
+          detailsPlaceholder="ഹിജ്റ മാസം, ദിവസം, മഹാന്റെ പേര്, സ്ഥലം, ആധാര സ്രോതസ്സ്…"
+          trigger={
+            <Button className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-sm">
+              <Plus className="h-3.5 w-3.5" />
+              Submit festival date
+            </Button>
+          }
+        />
+      </div>
     </div>
   );
 }

@@ -1,4 +1,6 @@
-import type { Maqam } from "@/data/maqams";
+import type { Maqam, MaqamRegion } from "@/data/maqams";
+
+export type ContentRegion = MaqamRegion;
 
 export type DbMaqam = Maqam & {
   createdFromRequestId?: string | null;
@@ -23,7 +25,7 @@ export type DbUroos = {
   city: string;
   state?: string;
   country: string;
-  region?: "kerala" | "india" | "worldwide";
+  region?: ContentRegion;
   description: string;
   history?: string;
   significance?: string;

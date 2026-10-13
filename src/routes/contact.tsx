@@ -38,7 +38,7 @@ function ContactPage() {
           <div className="space-y-5">
             {[
               { Icon: Mail, title: "Email", text: "hello@ziyarath.com" },
-              { Icon: MessageCircle, title: "WhatsApp", text: "+91 00000 00000" },
+              { Icon: MessageCircle, title: "WhatsApp", text: "+91 79940 92820" },
               { Icon: MapPin, title: "Based in", text: "Kerala, India" },
             ].map(({ Icon, title, text }) => (
               <div

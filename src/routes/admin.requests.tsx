@@ -1100,7 +1100,7 @@ function AdminRequestsPage() {
                   </div>
                 )}
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-3">
                   <div className="grid gap-2">
                     <Label htmlFor="cr-city">City / District</Label>
                     <Input
@@ -1117,6 +1117,20 @@ function AdminRequestsPage() {
                       value={createForm.country || "India"}
                       onChange={(e) => setCreateForm({ ...createForm, country: e.target.value })}
                     />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="cr-region">Region</Label>
+                    <select
+                      id="cr-region"
+                      value={createForm.region || "kerala"}
+                      onChange={(e) => setCreateForm({ ...createForm, region: e.target.value })}
+                      className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="kerala">Kerala</option>
+                      <option value="india">India</option>
+                      <option value="middle-east">Middle East</option>
+                      <option value="worldwide">Worldwide</option>
+                    </select>
                   </div>
                 </div>
 

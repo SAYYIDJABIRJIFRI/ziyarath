@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
 import { SiteLayout } from "@/components/site/SiteLayout";
+import { REGION_LABELS, type MaqamRegion } from "@/data/maqams";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -118,8 +119,8 @@ function UroosDetailPage() {
               <BreadcrumbSeparator />
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link to="/uroos" search={{ region: uroos.region || "kerala" } as any}>
-                    {uroos.region === "worldwide" ? "Worldwide" : uroos.region === "india" ? "India" : "Kerala"}
+                  <Link to="/uroos" search={{ region: (uroos.region as any) || "kerala" } as any}>
+                    {REGION_LABELS[(uroos.region as MaqamRegion) || "kerala"] || "Kerala"}
                   </Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
@@ -298,10 +299,12 @@ function UroosDetailPage() {
                         Region & Location
                       </span>
                       <p className="font-bold text-foreground text-sm leading-tight">
-                        {uroos.region === "worldwide"
+                        {uroos.region === "middle-east"
+                          ? `Middle East (${uroos.country})`
+                          : uroos.region === "worldwide"
                           ? `Worldwide (${uroos.country})`
                           : uroos.region === "india"
-                          ? `Rest of India (${uroos.state || uroos.city})`
+                          ? `India (${uroos.state || uroos.city})`
                           : `Kerala (${uroos.city})`}
                       </p>
                     </div>
@@ -561,10 +564,16 @@ function UroosDetailPage() {
                   </Button>
 
                   <Button asChild variant="outline" className="w-full justify-between h-9 text-xs">
-                    <Link to="/uroos" search={{ region: uroos.region || "kerala" } as any}>
+                    <Link to="/uroos" search={{ region: (uroos.region as any) || "kerala" } as any}>
                       <span className="flex items-center gap-2">
                         <MapPin className="h-3.5 w-3.5 text-emerald-600" />
-                        {uroos.region === "worldwide" ? "All Worldwide Uroos" : uroos.region === "india" ? "All India Uroos" : "All Kerala Uroos"}
+                        {uroos.region === "middle-east"
+                          ? "All Middle East Uroos"
+                          : uroos.region === "worldwide"
+                          ? "All Worldwide Uroos"
+                          : uroos.region === "india"
+                          ? "All India Uroos"
+                          : "All Kerala Uroos"}
                       </span>
                       <ArrowRight className="h-3.5 w-3.5" />
                     </Link>

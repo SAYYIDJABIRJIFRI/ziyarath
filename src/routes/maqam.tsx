@@ -167,23 +167,23 @@ function MaqamPage() {
       region === "all"
         ? []
         : MAQAMS.filter(
-            (m) =>
-              matchesQuery(m) && (category === "all" || m.category === category),
-          );
+          (m) =>
+            matchesQuery(m) && (category === "all" || m.category === category),
+        );
     const withoutCategory =
       category === "all"
         ? []
         : MAQAMS.filter(
-            (m) => matchesQuery(m) && (region === "all" || m.region === region),
-          );
+          (m) => matchesQuery(m) && (region === "all" || m.region === region),
+        );
     const withoutQuery =
       q.length === 0
         ? []
         : MAQAMS.filter(
-            (m) =>
-              (region === "all" || m.region === region) &&
-              (category === "all" || m.category === category),
-          );
+          (m) =>
+            (region === "all" || m.region === region) &&
+            (category === "all" || m.category === category),
+        );
 
     return {
       withoutRegion: withoutRegion.length,
@@ -378,9 +378,8 @@ function MaqamPage() {
                   search={{ q: query, region, category, page: Math.max(1, currentPage - 1) }}
                   aria-label="Previous page"
                   aria-disabled={currentPage === 1}
-                  className={`inline-flex h-10 items-center gap-1 rounded-full border border-border bg-card px-4 text-sm font-medium transition-colors hover:bg-primary hover:text-primary-foreground ${
-                    currentPage === 1 ? "pointer-events-none opacity-40" : ""
-                  }`}
+                  className={`inline-flex h-10 items-center gap-1 rounded-full border border-border bg-card px-4 text-sm font-medium transition-colors hover:bg-primary hover:text-primary-foreground ${currentPage === 1 ? "pointer-events-none opacity-40" : ""
+                    }`}
                 >
                   <ChevronLeft className="h-4 w-4" /> Prev
                 </Link>
@@ -394,11 +393,10 @@ function MaqamPage() {
                       to="/maqam"
                       search={{ q: query, region, category, page: n }}
                       aria-current={active ? "page" : undefined}
-                      className={`grid h-10 w-10 place-items-center rounded-full border text-sm font-semibold transition-colors ${
-                        active
+                      className={`grid h-10 w-10 place-items-center rounded-full border text-sm font-semibold transition-colors ${active
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border bg-card hover:bg-primary/10 hover:text-primary"
-                      }`}
+                        }`}
                     >
                       {n}
                     </Link>
@@ -410,9 +408,8 @@ function MaqamPage() {
                   search={{ q: query, region, category, page: Math.min(totalPages, currentPage + 1) }}
                   aria-label="Next page"
                   aria-disabled={currentPage === totalPages}
-                  className={`inline-flex h-10 items-center gap-1 rounded-full border border-border bg-card px-4 text-sm font-medium transition-colors hover:bg-primary hover:text-primary-foreground ${
-                    currentPage === totalPages ? "pointer-events-none opacity-40" : ""
-                  }`}
+                  className={`inline-flex h-10 items-center gap-1 rounded-full border border-border bg-card px-4 text-sm font-medium transition-colors hover:bg-primary hover:text-primary-foreground ${currentPage === totalPages ? "pointer-events-none opacity-40" : ""
+                    }`}
                 >
                   Next <ChevronRight className="h-4 w-4" />
                 </Link>

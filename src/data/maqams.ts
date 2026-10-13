@@ -243,6 +243,57 @@ export const MAQAMS: Maqam[] = [
       "The tomb is covered with green silk and housed in a small but beautifully maintained chamber. The compound includes a mosque and a large open area for festival gatherings.",
   },
   {
+    id: "madavoor",
+    name: "Madavoor C.M. Maqam Sharif",
+    malayalamName: "മടവൂർ സി.എം. മഖാം ശരീഫ്",
+    location: "Madavoor C.M. Center",
+    city: "Madavoor, Kozhikode",
+    country: "India",
+    region: "kerala",
+    category: "sufi",
+    era: "20th century",
+    description:
+      "Resting place of Sayyid Muhammad Mouladaveela C.M. Valiyullah, one of the most beloved Ba'alawi spiritual masters of modern Kerala, renowned for his miracles (karamat) and compassionate guidance.",
+    significance:
+      "A major spiritual centre in North Malabar drawing thousands of seekers for collective Thasbeeh prayers, Haddad Ratheeb recitations, and community harmony gatherings.",
+    bestTimeToVisit: "Annual Uroos in Rabi al-Thani",
+    addressDetail: "Madavoor C.M. Maqam Sharif, Madavoor, Kozhikode District, Kerala",
+    visitingHours: [
+      { label: "Maqam open", hours: "Open 24 hours" },
+      { label: "Ziyarath access", hours: "After Fajr to Isha" },
+    ],
+    nerchaa: [
+      {
+        title: "Annual Uroos Mubarak",
+        description:
+          "A 5-day spiritual convention with all-night prayers, Quranic recitations, dhikr assemblies, and distribution of blessed neychoru (ghee rice) to over 50,000 devotees.",
+        month: "Rabi al-Thani",
+      },
+    ],
+    howToReach: [
+      {
+        mode: "By Air",
+        details: "Calicut International Airport (CCJ) — 40 km away. Taxis and pre-paid cabs available.",
+      },
+      {
+        mode: "By Train",
+        details: "Kozhikode Railway Station — 22 km. Auto-rickshaws and buses connect to Madavoor.",
+      },
+      {
+        mode: "By Road",
+        details: "Connected via NH 66 and local roads from Kozhikode. Regular KSRTC and private buses available.",
+      },
+    ],
+    contactInfo: {
+      phone: "+91 495 285 6200",
+    },
+    facilities: ["Ablution area", "Restroom", "Parking", "Guest house", "Free community meals during Uroos"],
+    history:
+      "Sayyid Muhammad Mouladaveela C.M. Valiyullah was one of the most celebrated Ba'alawi spiritual masters of 20th-century Kerala. Known for his deep piety, miraculous interventions (karamat), and unwavering service to people of all backgrounds, he became a beacon of spiritual succour across North Malabar. The maqam was established at his resting place and has since become a major pilgrimage destination.",
+    architecture:
+      "The maqam features a traditional Kerala-Islamic design with a green-domed tomb chamber, marble flooring, and ornamental brass railings. The surrounding compound includes a spacious prayer hall and covered areas for community gatherings during the annual Uroos.",
+  },
+  {
     id: "ajmer",
     name: "Ajmer Sharif Dargah",
     location: "Khwaja Moinuddin Chishti Dargah",
