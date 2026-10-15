@@ -200,8 +200,8 @@ export const getMyManagedPagesFn = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }) => {
     const { listMaqams, listUroos, getUserAllotments } = await import("./content-db.server");
-    const allMaqams = await listMaqams();
-    const allUroos = await listUroos();
+    const allMaqams = await listMaqams(true);
+    const allUroos = await listUroos(true);
 
     // If user is super_admin, return all pages
     if (data.role === "super_admin" || (data.userEmail && data.userEmail.includes("superadmin"))) {
