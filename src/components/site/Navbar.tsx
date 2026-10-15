@@ -3,6 +3,7 @@ import { Moon, Sun, Menu, X, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
+import { AdminProfileMenu } from "./AdminProfileMenu";
 import logoMark from "@/assets/ziyarath-mark.png";
 import logoFull from "@/assets/ziyarath-logo.png";
 
@@ -65,15 +66,9 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Link
-            to="/admin"
-            className="hidden sm:inline-flex items-center gap-1.5 h-9 px-3 rounded-full border border-border bg-card/80 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            activeProps={{ className: "border-primary/40 bg-primary/10 text-primary" }}
-            title="Admin Portal"
-          >
-            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-            Admin
-          </Link>
+          {/* Top Right Admin Button showing personal profile & role actions */}
+          <AdminProfileMenu className="hidden sm:inline-flex" />
+
           <button
             onClick={toggle}
             aria-label="Toggle dark mode"
@@ -104,13 +99,9 @@ export function Navbar() {
                 {item.label}
               </Link>
             ))}
-            <Link
-              to="/admin"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-primary hover:bg-accent"
-            >
-              <ShieldCheck className="h-4 w-4" /> Admin Portal
-            </Link>
+            <div className="pt-2 border-t border-border mt-1">
+              <AdminProfileMenu className="w-full justify-between" />
+            </div>
           </nav>
         </div>
       )}

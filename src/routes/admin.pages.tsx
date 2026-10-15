@@ -209,18 +209,41 @@ function AdminPagesManagement() {
   }, [currentRole, currentUserEmail, currentUserId]);
 
   const handleRoleSwitch = (persona: "super_admin" | "allotted_admin" | "unallotted_admin") => {
+    let mockData = null;
     if (persona === "super_admin") {
       setCurrentRole("super_admin");
       setCurrentUserEmail("superadmin@ziyarath.com");
       setCurrentUserId("superadmin-001");
+      mockData = {
+        email: "superadmin@ziyarath.com",
+        id: "superadmin-001",
+        role: "super_admin",
+        name: "Super Administrator",
+      };
     } else if (persona === "allotted_admin") {
       setCurrentRole("admin");
       setCurrentUserEmail("admin@ziyarath.com");
       setCurrentUserId("admin-system");
+      mockData = {
+        email: "admin@ziyarath.com",
+        id: "admin-system",
+        role: "admin",
+        name: "Allotted Page Admin",
+      };
     } else {
       setCurrentRole("admin");
       setCurrentUserEmail("newadmin@ziyarath.com");
       setCurrentUserId("newadmin-001");
+      mockData = {
+        email: "newadmin@ziyarath.com",
+        id: "newadmin-001",
+        role: "admin",
+        name: "New Page Admin (Unallotted)",
+      };
+    }
+    if (mockData) {
+      localStorage.setItem("ziyarath_mock_user", JSON.stringify(mockData));
+      window.dispatchEvent(new Event("ziyarath-auth-update"));
     }
   };
 
