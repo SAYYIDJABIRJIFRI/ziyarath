@@ -152,6 +152,7 @@ export const createAllotmentFn = createServerFn({ method: "POST" })
       targetTitle: string;
       assignedBy: string;
       assignedByEmail?: string;
+      assignedByRole?: "super_admin" | "admin" | "user";
       notes?: string;
     }) =>
       z
@@ -163,20 +164,48 @@ export const createAllotmentFn = createServerFn({ method: "POST" })
           targetTitle: z.string().min(1),
           assignedBy: z.string().min(1),
           assignedByEmail: z.string().email().optional(),
+          assignedByRole: z.enum(["super_admin", "admin", "user"]).optional(),
           notes: z.string().max(500).optional(),
         })
         .parse(input)
   )
   .handler(async ({ data }) => {
-    const { createAllotment } = await import("./content-db.server");
+    const { createAllotment, getUserRole } = await import("./content-db.server");
+    const role = data.assignedByRole || (await getUserRole(data.assignedBy, data.assignedByEmail));
+    const isSuper = role === "super_admin" || (data.assignedByEmail && data.assignedByEmail.toLowerCase().includes("superadmin"));
+    if (!isSuper) {
+      throw new Error("Permission Denied: Only Super Admins can allot pages to Page Admins.");
+    }
     return createAllotment(data);
   });
 
 // Super Admin: Revoke page allotment
 export const revokeAllotmentFn = createServerFn({ method: "POST" })
-  .inputValidator((input: { id: string }) => z.object({ id: z.string().min(1) }).parse(input))
+  .inputValidator(
+    (input: {
+      id: string;
+      requesterId?: string;
+      requesterEmail?: string;
+      requesterRole?: "super_admin" | "admin" | "user";
+    }) =>
+      z
+        .object({
+          id: z.string().min(1),
+          requesterId: z.string().optional(),
+          requesterEmail: z.string().optional(),
+          requesterRole: z.enum(["super_admin", "admin", "user"]).optional(),
+        })
+        .parse(input)
+  )
   .handler(async ({ data }) => {
-    const { revokeAllotment } = await import("./content-db.server");
+    const { revokeAllotment, getUserRole } = await import("./content-db.server");
+    if (data.requesterId || data.requesterEmail) {
+      const role = data.requesterRole || (await getUserRole(data.requesterId || "", data.requesterEmail));
+      const isSuper = role === "super_admin" || (data.requesterEmail && data.requesterEmail.toLowerCase().includes("superadmin"));
+      if (!isSuper) {
+        throw new Error("Permission Denied: Only Super Admins can revoke page allotments.");
+      }
+    }
     return revokeAllotment(data.id);
   });
 
@@ -204,7 +233,8 @@ export const getMyManagedPagesFn = createServerFn({ method: "GET" })
     const allUroos = await listUroos(true);
 
     // If user is super_admin, return all pages
-    if (data.role === "super_admin" || (data.userEmail && data.userEmail.includes("superadmin"))) {
+    const isSuper = data.role === "super_admin" || (data.userEmail && data.userEmail.toLowerCase().includes("superadmin"));
+    if (isSuper) {
       return {
         isSuperAdmin: true,
         allottedMaqams: allMaqams,
@@ -212,7 +242,7 @@ export const getMyManagedPagesFn = createServerFn({ method: "GET" })
       };
     }
 
-    // Otherwise filter by user allotments
+    // Otherwise Page Admin: filter strictly by user allotments
     const allotments = await getUserAllotments(data.userId, data.userEmail);
     const maqamIds = new Set(allotments.filter((a) => a.targetType === "maqam").map((a) => a.targetId));
     const uroosIds = new Set(allotments.filter((a) => a.targetType === "uroos").map((a) => a.targetId));
@@ -232,6 +262,7 @@ export const updatePageContentFn = createServerFn({ method: "POST" })
       id: string;
       editorId: string;
       editorEmail?: string;
+      editorRole?: "super_admin" | "admin" | "user";
       data: Record<string, unknown>;
     }) =>
       z
@@ -240,12 +271,35 @@ export const updatePageContentFn = createServerFn({ method: "POST" })
           id: z.string().min(1),
           editorId: z.string().min(1),
           editorEmail: z.string().optional(),
+          editorRole: z.enum(["super_admin", "admin", "user"]).optional(),
           data: z.record(z.string(), z.unknown()),
         })
         .parse(input)
   )
   .handler(async ({ data }) => {
-    const { updateMaqam, updateUroos, insertAudit } = await import("./content-db.server");
+    const { updateMaqam, updateUroos, insertAudit, getUserAllotments, getUserRole } = await import("./content-db.server");
+    
+    // Determine effective role
+    let role = data.editorRole;
+    if (!role) {
+      role = await getUserRole(data.editorId, data.editorEmail);
+    }
+    const isSuper = role === "super_admin" || (data.editorEmail && data.editorEmail.toLowerCase().includes("superadmin"));
+
+    // Page Admin verification: Must be allotted to this user
+    if (!isSuper) {
+      const allotments = await getUserAllotments(data.editorId, data.editorEmail);
+      const isAllotted = allotments.some(
+        (a) => a.targetType === data.type && a.targetId === data.id
+      );
+
+      if (!isAllotted) {
+        throw new Error(
+          `Permission Denied: Page Admins can only edit pages allotted to them. You are not authorized to edit ${data.type} "${data.id}".`
+        );
+      }
+    }
+
     let result: unknown = null;
     if (data.type === "maqam") {
       result = await updateMaqam(data.id, data.data as any);
@@ -260,7 +314,7 @@ export const updatePageContentFn = createServerFn({ method: "POST" })
       request_subject: `Updated ${data.type} ${data.id}`,
       actor_id: data.editorId,
       actor_email: data.editorEmail || null,
-      notes: `Updated page content for ${data.id}`,
+      notes: `Updated page content for ${data.id} by ${isSuper ? "Super Admin" : "Page Admin"}`,
     });
 
     return { success: Boolean(result) };

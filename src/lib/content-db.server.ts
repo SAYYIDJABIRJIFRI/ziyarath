@@ -721,14 +721,14 @@ export async function listSystemUsers(): Promise<SystemUser[]> {
 }
 
 export async function getUserRole(userId: string, email?: string | null): Promise<"super_admin" | "admin" | "user"> {
-  // If email matches primary super admin or starts with superadmin
-  if (email && (email.toLowerCase().includes("superadmin") || email.toLowerCase() === "admin@ziyarath.com")) {
+  // Only superadmin accounts have super_admin role
+  if (email && email.toLowerCase().includes("superadmin")) {
     return "super_admin";
   }
   const users = await listSystemUsers();
   const match = users.find((u) => u.userId === userId || (email && u.userEmail.toLowerCase() === email.toLowerCase()));
   if (match) return match.role;
-  // Default to admin for registered users in demo environment
+  // Default to page admin for registered system users
   return "admin";
 }
 
