@@ -179,14 +179,15 @@ export async function ensureContentSchema(db: any): Promise<void> {
   }
 }
 
-export async function listMaqams(): Promise<DbMaqam[]> {
+export async function listMaqams(includeAllStatuses = false): Promise<DbMaqam[]> {
   const db = getDB();
   if (db) {
     try {
       await ensureContentSchema(db);
-      const { results } = await db
-        .prepare("SELECT * FROM maqams WHERE status = 'published' ORDER BY name ASC")
-        .all<Record<string, unknown>>();
+      const query = includeAllStatuses
+        ? "SELECT * FROM maqams ORDER BY name ASC"
+        : "SELECT * FROM maqams WHERE status = 'published' ORDER BY name ASC";
+      const { results } = await db.prepare(query).all<Record<string, unknown>>();
       if (results && results.length > 0) {
         // Map D1 snake_case to DbMaqam
         const mapped: DbMaqam[] = results.map((r) => ({
@@ -222,13 +223,15 @@ export async function listMaqams(): Promise<DbMaqam[]> {
       // Fall through to memory
     }
   }
-  return memoryMaqams.filter((m) => m.status === "published");
+  return includeAllStatuses
+    ? memoryMaqams
+    : memoryMaqams.filter((m) => m.status === "published");
 }
 
 export async function getMaqamById(id: string): Promise<{ maqam: DbMaqam | null; connectedUroos: DbUroos[] }> {
-  const allMaqams = await listMaqams();
+  const allMaqams = await listMaqams(true);
   const maqam = allMaqams.find((m) => m.id === id) || null;
-  const uroosList = await listUroos();
+  const uroosList = await listUroos(true);
   const connectedUroos = uroosList.filter((u) => u.maqamId === id);
   return { maqam, connectedUroos };
 }
@@ -368,13 +371,14 @@ export async function updateMaqam(id: string, partial: Partial<DbMaqam>): Promis
 // Uroos Operations
 // -------------------------------------------------------------
 
-export async function listUroos(): Promise<DbUroos[]> {
+export async function listUroos(includeAllStatuses = false): Promise<DbUroos[]> {
   const db = getDB();
   if (db) {
     try {
-      const { results } = await db
-        .prepare("SELECT * FROM uroos WHERE status = 'published' ORDER BY hijri_month ASC, hijri_day ASC")
-        .all<Record<string, unknown>>();
+      const query = includeAllStatuses
+        ? "SELECT * FROM uroos ORDER BY hijri_month ASC, hijri_day ASC"
+        : "SELECT * FROM uroos WHERE status = 'published' ORDER BY hijri_month ASC, hijri_day ASC";
+      const { results } = await db.prepare(query).all<Record<string, unknown>>();
       if (results && results.length > 0) {
         return results.map((r) => ({
           id: String(r.id),
@@ -412,13 +416,15 @@ export async function listUroos(): Promise<DbUroos[]> {
       // Fallback to memory
     }
   }
-  return memoryUroos.filter((u) => u.status === "published");
+  return includeAllStatuses
+    ? memoryUroos
+    : memoryUroos.filter((u) => u.status === "published");
 }
 
 export async function getUroosById(
   id: string
 ): Promise<{ uroos: DbUroos | null; connectedMaqam: DbMaqam | null }> {
-  const allUroos = await listUroos();
+  const allUroos = await listUroos(true);
   const uroos = allUroos.find((u) => u.id === id) || null;
   let connectedMaqam: DbMaqam | null = null;
   if (uroos && uroos.maqamId) {
