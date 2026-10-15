@@ -298,7 +298,11 @@ export async function createMaqam(input: Omit<DbMaqam, "createdAt" | "updatedAt"
 
 export async function updateMaqam(id: string, partial: Partial<DbMaqam>): Promise<DbMaqam | null> {
   const now = new Date().toISOString();
-  const existing = memoryMaqams.find((m) => m.id === id);
+  let existing = memoryMaqams.find((m) => m.id === id);
+  if (!existing) {
+    const res = await getMaqamById(id);
+    if (res.maqam) existing = res.maqam;
+  }
   if (!existing) return null;
 
   const updated: DbMaqam = {
@@ -308,18 +312,23 @@ export async function updateMaqam(id: string, partial: Partial<DbMaqam>): Promis
   };
 
   const idx = memoryMaqams.findIndex((m) => m.id === id);
-  if (idx >= 0) memoryMaqams[idx] = updated;
+  if (idx >= 0) {
+    memoryMaqams[idx] = updated;
+  } else {
+    memoryMaqams.unshift(updated);
+  }
 
   const db = getDB();
   if (db) {
     try {
+      await ensureContentSchema(db);
       await db
         .prepare(
           `UPDATE maqams SET
             name = ?, malayalam_name = ?, location = ?, city = ?, country = ?, region = ?, category = ?,
             era = ?, description = ?, significance = ?, best_time_to_visit = ?, address_detail = ?,
             visiting_hours = ?, facilities = ?, how_to_reach = ?, contact_info = ?, history = ?,
-            architecture = ?, updated_at = ?
+            architecture = ?, cover_image = ?, source_url = ?, status = ?, updated_at = ?
            WHERE id = ?`
         )
         .bind(
@@ -341,12 +350,15 @@ export async function updateMaqam(id: string, partial: Partial<DbMaqam>): Promis
           updated.contactInfo ? JSON.stringify(updated.contactInfo) : null,
           updated.history || null,
           updated.architecture || null,
+          updated.coverImage || null,
+          updated.sourceUrl || null,
+          updated.status || "published",
           now,
           id
         )
         .run();
-    } catch {
-      // Ignore
+    } catch (err) {
+      console.warn("[D1 Content] updateMaqam error:", err);
     }
   }
   return updated;
@@ -486,7 +498,11 @@ export async function createUroos(input: Omit<DbUroos, "createdAt" | "updatedAt"
 
 export async function updateUroos(id: string, partial: Partial<DbUroos>): Promise<DbUroos | null> {
   const now = new Date().toISOString();
-  const existing = memoryUroos.find((u) => u.id === id);
+  let existing = memoryUroos.find((u) => u.id === id);
+  if (!existing) {
+    const res = await getUroosById(id);
+    if (res.uroos) existing = res.uroos;
+  }
   if (!existing) return null;
 
   const updated: DbUroos = {
@@ -496,11 +512,16 @@ export async function updateUroos(id: string, partial: Partial<DbUroos>): Promis
   };
 
   const idx = memoryUroos.findIndex((u) => u.id === id);
-  if (idx >= 0) memoryUroos[idx] = updated;
+  if (idx >= 0) {
+    memoryUroos[idx] = updated;
+  } else {
+    memoryUroos.unshift(updated);
+  }
 
   const db = getDB();
   if (db) {
     try {
+      await ensureContentSchema(db);
       await db
         .prepare(
           `UPDATE uroos SET
@@ -508,7 +529,7 @@ export async function updateUroos(id: string, partial: Partial<DbUroos>): Promis
             hijri_month = ?, hijri_month_name = ?, hijri_day = ?, gregorian_date = ?, recurrence = ?,
             venue_name = ?, city = ?, state = ?, country = ?, description = ?, history = ?,
             significance = ?, program_schedule = ?, nercha_offerings = ?, how_to_reach = ?,
-            organizer_name = ?, organizer_contact = ?, updated_at = ?
+            organizer_name = ?, organizer_contact = ?, cover_image = ?, source_url = ?, status = ?, updated_at = ?
            WHERE id = ?`
         )
         .bind(
@@ -534,12 +555,15 @@ export async function updateUroos(id: string, partial: Partial<DbUroos>): Promis
           updated.howToReach ? JSON.stringify(updated.howToReach) : null,
           updated.organizerName || null,
           updated.organizerContact || null,
+          updated.coverImage || null,
+          updated.sourceUrl || null,
+          updated.status || "published",
           now,
           id
         )
         .run();
-    } catch {
-      // Ignore
+    } catch (err) {
+      console.warn("[D1 Content] updateUroos error:", err);
     }
   }
   return updated;
