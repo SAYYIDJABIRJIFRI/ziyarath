@@ -646,13 +646,50 @@ function AdminPagesManagement() {
             <p className="text-sm text-muted-foreground">Loading pages…</p>
           </div>
         ) : totalPagesCount === 0 ? (
-          <Card className="p-12 text-center border-dashed">
-            <Lock className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-40" />
-            <h3 className="text-lg font-bold">No Pages Allotted Yet</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto mt-1">
-              You currently do not have any Maqam or Uroos pages allotted to your account.
-              Contact the Super Admin to request an allotment.
+          <Card className="p-10 text-center border-dashed bg-card/60 max-w-2xl mx-auto my-8 shadow-sm">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600">
+              <Lock className="h-7 w-7" />
+            </div>
+            <Badge className="mb-3 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-xs">
+              Page Admin Login Account • 0 Pages Allotted
+            </Badge>
+            <h3 className="text-xl font-bold text-foreground">
+              {currentUserEmail}
+            </h3>
+            <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto leading-relaxed">
+              Your <strong>Page Admin</strong> account is active, but you currently have <strong>only a login account</strong>. No Maqam or Uroos pages have been allotted to you yet.
             </p>
+            <div className="mt-6 rounded-lg border border-border bg-muted/40 p-4 text-xs text-left text-muted-foreground space-y-2.5">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Account Active:</strong> You can sign in and access the portal dashboard.
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <ShieldCheck className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Access Policy:</strong> New admins are Page Admins by default. If no page has been allotted to you, you cannot edit any pages.
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                <span>
+                  <strong>How to Get Allotted:</strong> The Super Admin assigns pages to your email in <span className="font-semibold text-foreground">/admin/allotments</span> or when approving a community submission.
+                </span>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleRoleSwitch("super_admin")}
+                className="text-xs gap-1.5"
+              >
+                <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                Switch to Super Admin to Allot a Page
+              </Button>
+            </div>
           </Card>
         ) : (
           <div className="space-y-8">
