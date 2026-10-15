@@ -179,14 +179,19 @@ function AdminPagesManagement() {
     loadData(currentRole, currentUserEmail, currentUserId);
   }, [currentRole, currentUserEmail, currentUserId]);
 
-  const handleRoleSwitch = (newRole: "super_admin" | "admin") => {
-    setCurrentRole(newRole);
-    if (newRole === "super_admin") {
+  const handleRoleSwitch = (persona: "super_admin" | "allotted_admin" | "unallotted_admin") => {
+    if (persona === "super_admin") {
+      setCurrentRole("super_admin");
       setCurrentUserEmail("superadmin@ziyarath.com");
       setCurrentUserId("superadmin-001");
-    } else {
+    } else if (persona === "allotted_admin") {
+      setCurrentRole("admin");
       setCurrentUserEmail("admin@ziyarath.com");
       setCurrentUserId("admin-system");
+    } else {
+      setCurrentRole("admin");
+      setCurrentUserEmail("newadmin@ziyarath.com");
+      setCurrentUserId("newadmin-001");
     }
   };
 
