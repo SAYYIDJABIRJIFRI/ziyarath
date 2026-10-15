@@ -489,23 +489,33 @@ function AdminPagesManagement() {
             <div className="inline-flex rounded-lg border border-border bg-card p-1 text-xs">
               <button
                 onClick={() => handleRoleSwitch("super_admin")}
-                className={`px-3 py-1 rounded-md transition-all ${
-                  currentRole === "super_admin"
+                className={`px-2.5 py-1 rounded-md transition-all ${
+                  currentUserEmail === "superadmin@ziyarath.com"
                     ? "bg-primary text-primary-foreground font-semibold shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Super Admin (All Pages)
+                Super Admin
               </button>
               <button
-                onClick={() => handleRoleSwitch("admin")}
-                className={`px-3 py-1 rounded-md transition-all ${
-                  currentRole === "admin"
+                onClick={() => handleRoleSwitch("allotted_admin")}
+                className={`px-2.5 py-1 rounded-md transition-all ${
+                  currentUserEmail === "admin@ziyarath.com"
                     ? "bg-primary text-primary-foreground font-semibold shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Page Admin (Allotted Only)
+                Allotted Admin
+              </button>
+              <button
+                onClick={() => handleRoleSwitch("unallotted_admin")}
+                className={`px-2.5 py-1 rounded-md transition-all ${
+                  currentUserEmail === "newadmin@ziyarath.com"
+                    ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                New Admin (Unallotted)
               </button>
             </div>
 
@@ -538,7 +548,8 @@ function AdminPagesManagement() {
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
               <span>
-                <strong>Page Admin Mode:</strong> You can access, view, and edit <strong>only pages allotted to your account</strong> ({currentUserEmail}). Non-allotted pages are restricted.
+                <strong>Page Admin Mode:</strong> You can view and edit <strong>only pages allotted to your account</strong> ({currentUserEmail}). Non-allotted pages are restricted.
+                {totalPagesCount === 0 && " (You currently have only an active login account with 0 pages allotted)."}
               </span>
             </div>
             <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 shrink-0 w-fit">
