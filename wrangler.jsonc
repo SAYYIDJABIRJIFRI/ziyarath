@@ -1,9 +1,15 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "ziyarath-09",
+  "name": "ziyarathv",
   "compatibility_date": "2025-09-24",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server.ts",
+  "vars": {
+    "SUPABASE_URL": "https://nnvdwxskbaevzupbhdks.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_EkunrX2CYc-QbmjmGG8_wA_W8u7NIt8",
+    "VITE_SUPABASE_URL": "https://nnvdwxskbaevzupbhdks.supabase.co",
+    "VITE_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_EkunrX2CYc-QbmjmGG8_wA_W8u7NIt8"
+  },
   "d1_databases": [
     {
       "binding": "DB",
