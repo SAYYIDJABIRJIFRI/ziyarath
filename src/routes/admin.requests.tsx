@@ -105,7 +105,7 @@ function AdminRequestsPage() {
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
   const [isAdmin, setIsAdmin] = useState(true);
-  const [currentUserEmail, setCurrentUserEmail] = useState("admin@ziyarath.com");
+  const [currentUserEmail, setCurrentUserEmail] = useState("superadmin@ziyarath.com");
   const [claiming, setClaiming] = useState(false);
   const [rows, setRows] = useState<RequestRow[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -235,7 +235,7 @@ function AdminRequestsPage() {
   }, [auditFn]);
 
 
-  // Non-blocking session detection
+  // Session detection & Super Admin restriction
   useEffect(() => {
     let mounted = true;
     const check = async () => {
@@ -244,8 +244,13 @@ function AdminRequestsPage() {
         const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 800));
         const res: any = await Promise.race([sessionPromise, timeoutPromise]);
         if (!mounted) return;
-        if (res?.data?.session?.user?.email) {
-          setCurrentUserEmail(res.data.session.user.email);
+        const email = res?.data?.session?.user?.email;
+        if (email) {
+          setCurrentUserEmail(email);
+          if (!email.toLowerCase().includes("superadmin")) {
+            toast.error("Requests Queue is only for Super Admins. Redirected to /admin/pages.");
+            navigate({ to: "/admin/pages" });
+          }
         }
       } catch {
         // Non-blocking
@@ -255,7 +260,7 @@ function AdminRequestsPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [navigate]);
 
   const fetchRows = useCallback(async () => {
     setLoading(true);
@@ -493,6 +498,38 @@ function AdminRequestsPage() {
   const allVisibleChecked =
     filtered.length > 0 && filtered.every((r) => checkedIds.has(r.id));
   const someChecked = checkedIds.size > 0;
+
+  const isSuperAdmin = currentUserEmail.toLowerCase().includes("superadmin");
+
+  if (!isSuperAdmin) {
+    return (
+      <SiteLayout>
+        <div className="mx-auto max-w-xl px-4 py-20 text-center">
+          <Card className="p-8 border-dashed shadow-sm">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600">
+              <ShieldAlert className="h-7 w-7" />
+            </div>
+            <Badge className="mb-3 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-xs">
+              Super Admin Access Only
+            </Badge>
+            <h2 className="text-xl font-bold text-foreground">
+              Requests Inbox is Restricted
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Reviewing community requests and creating live pages is restricted to <strong>Super Admins</strong>. As a Page Admin ({currentUserEmail}), you can only access and edit your allotted pages.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Link to="/admin/pages">
+                  Go to My Allotted Pages
+                </Link>
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </SiteLayout>
+    );
+  }
 
   return (
     <TooltipProvider delayDuration={200}>
