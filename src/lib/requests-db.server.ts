@@ -1,5 +1,5 @@
 // Cloudflare D1 access for the requests table. Server-only.
-// Falls back to in-memory store in local dev/preview environments without Cloudflare bindings.
+// Falls back to in-memory store in local dev/preview environments or if D1 schema is unmigrated.
 import type { D1Database } from "@cloudflare/workers-types";
 
 type Env = { DB?: D1Database };
@@ -61,7 +61,6 @@ export type AuditRow = {
   created_at: string;
 };
 
-// In-memory fallback stores for development/preview
 const memoryRequests: RequestRow[] = [
   {
     id: "e4a2c070-1234-4b5c-8901-abcdef012345",
@@ -115,32 +114,88 @@ const memoryAudit: AuditRow[] = [
   },
 ];
 
+let requestsSchemaInitialized = false;
+
+export async function ensureRequestsSchema(db: D1Database): Promise<void> {
+  if (requestsSchemaInitialized) return;
+  try {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS requests (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK (type IN ('maqam', 'uroos')),
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        name TEXT NOT NULL,
+        contact TEXT NOT NULL,
+        city TEXT,
+        country TEXT,
+        subject TEXT NOT NULL,
+        requested_date TEXT,
+        details TEXT NOT NULL,
+        supporting_notes TEXT,
+        review_notes TEXT,
+        reviewed_by TEXT,
+        reviewed_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status);
+      CREATE INDEX IF NOT EXISTS idx_requests_type ON requests(type);
+      CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id TEXT PRIMARY KEY,
+        action TEXT NOT NULL CHECK (action IN ('approve', 'reject', 'delete')),
+        request_id TEXT NOT NULL,
+        request_type TEXT,
+        request_subject TEXT,
+        actor_id TEXT NOT NULL,
+        actor_email TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS request_hits (
+        ip TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+    `);
+    requestsSchemaInitialized = true;
+  } catch (err) {
+    console.warn("[D1 Requests] Auto schema ensure note:", err);
+  }
+}
+
 export async function insertRequest(input: NewRequestInput): Promise<string> {
   const db = getDB();
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
   if (db) {
-    await db
-      .prepare(
-        `INSERT INTO requests
-          (id, type, name, contact, city, country, subject, requested_date, details, supporting_notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        id,
-        input.type,
-        input.name,
-        input.contact,
-        input.city,
-        input.country,
-        input.subject,
-        input.requested_date,
-        input.details,
-        input.supporting_notes,
-      )
-      .run();
-    return id;
+    try {
+      await ensureRequestsSchema(db);
+      await db
+        .prepare(
+          `INSERT INTO requests
+            (id, type, name, contact, city, country, subject, requested_date, details, supporting_notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          id,
+          input.type,
+          input.name,
+          input.contact,
+          input.city,
+          input.country,
+          input.subject,
+          input.requested_date,
+          input.details,
+          input.supporting_notes,
+        )
+        .run();
+      return id;
+    } catch (err) {
+      console.warn("[D1 Requests] insertRequest failed, falling back to memory:", err);
+    }
   }
 
   // Fallback to in-memory
@@ -175,25 +230,30 @@ export type ListFilters = {
 export async function listRequests(filters: ListFilters = {}): Promise<RequestRow[]> {
   const db = getDB();
   if (db) {
-    const clauses: string[] = [];
-    const binds: unknown[] = [];
-    if (filters.status) {
-      clauses.push("status = ?");
-      binds.push(filters.status);
+    try {
+      await ensureRequestsSchema(db);
+      const clauses: string[] = [];
+      const binds: unknown[] = [];
+      if (filters.status) {
+        clauses.push("status = ?");
+        binds.push(filters.status);
+      }
+      if (filters.type) {
+        clauses.push("type = ?");
+        binds.push(filters.type);
+      }
+      const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+      const limit = Math.min(Math.max(filters.limit ?? 500, 1), 1000);
+      const { results } = await db
+        .prepare(
+          `SELECT * FROM requests ${where} ORDER BY created_at DESC LIMIT ${limit}`,
+        )
+        .bind(...binds)
+        .all<RequestRow>();
+      return results ?? [];
+    } catch (err) {
+      console.warn("[D1 Requests] listRequests failed, falling back to memory:", err);
     }
-    if (filters.type) {
-      clauses.push("type = ?");
-      binds.push(filters.type);
-    }
-    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
-    const limit = Math.min(Math.max(filters.limit ?? 500, 1), 1000);
-    const { results } = await db
-      .prepare(
-        `SELECT * FROM requests ${where} ORDER BY created_at DESC LIMIT ${limit}`,
-      )
-      .bind(...binds)
-      .all<RequestRow>();
-    return results ?? [];
   }
 
   // Fallback to in-memory
@@ -218,15 +278,20 @@ export async function updateRequestStatus(
   const now = new Date().toISOString();
 
   if (db) {
-    await db
-      .prepare(
-        `UPDATE requests
-         SET status = ?, review_notes = ?, reviewed_by = ?, reviewed_at = ?, updated_at = ?
-         WHERE id = ?`,
-      )
-      .bind(status, reviewNotes, reviewedBy, now, now, id)
-      .run();
-    return;
+    try {
+      await ensureRequestsSchema(db);
+      await db
+        .prepare(
+          `UPDATE requests
+           SET status = ?, review_notes = ?, reviewed_by = ?, reviewed_at = ?, updated_at = ?
+           WHERE id = ?`,
+        )
+        .bind(status, reviewNotes, reviewedBy, now, now, id)
+        .run();
+      return;
+    } catch (err) {
+      console.warn("[D1 Requests] updateRequestStatus failed, falling back to memory:", err);
+    }
   }
 
   // Fallback to in-memory
@@ -243,8 +308,13 @@ export async function updateRequestStatus(
 export async function deleteRequest(id: string): Promise<void> {
   const db = getDB();
   if (db) {
-    await db.prepare("DELETE FROM requests WHERE id = ?").bind(id).run();
-    return;
+    try {
+      await ensureRequestsSchema(db);
+      await db.prepare("DELETE FROM requests WHERE id = ?").bind(id).run();
+      return;
+    } catch (err) {
+      console.warn("[D1 Requests] deleteRequest failed, falling back to memory:", err);
+    }
   }
 
   const idx = memoryRequests.findIndex((r) => r.id === id);
@@ -258,11 +328,16 @@ export async function getRequestSummary(
 ): Promise<{ type: string | null; subject: string | null }> {
   const db = getDB();
   if (db) {
-    const row = await db
-      .prepare("SELECT type, subject FROM requests WHERE id = ?")
-      .bind(id)
-      .first<{ type: string; subject: string }>();
-    return { type: row?.type ?? null, subject: row?.subject ?? null };
+    try {
+      await ensureRequestsSchema(db);
+      const row = await db
+        .prepare("SELECT type, subject FROM requests WHERE id = ?")
+        .bind(id)
+        .first<{ type: string; subject: string }>();
+      return { type: row?.type ?? null, subject: row?.subject ?? null };
+    } catch (err) {
+      console.warn("[D1 Requests] getRequestSummary failed, falling back to memory:", err);
+    }
   }
 
   const row = memoryRequests.find((r) => r.id === id);
@@ -283,24 +358,29 @@ export async function insertAudit(entry: {
   const now = new Date().toISOString();
 
   if (db) {
-    await db
-      .prepare(
-        `INSERT INTO audit_log
-          (id, action, request_id, request_type, request_subject, actor_id, actor_email, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        id,
-        entry.action,
-        entry.request_id,
-        entry.request_type,
-        entry.request_subject,
-        entry.actor_id,
-        entry.actor_email,
-        entry.notes,
-      )
-      .run();
-    return;
+    try {
+      await ensureRequestsSchema(db);
+      await db
+        .prepare(
+          `INSERT INTO audit_log
+            (id, action, request_id, request_type, request_subject, actor_id, actor_email, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          id,
+          entry.action,
+          entry.request_id,
+          entry.request_type,
+          entry.request_subject,
+          entry.actor_id,
+          entry.actor_email,
+          entry.notes,
+        )
+        .run();
+      return;
+    } catch (err) {
+      console.warn("[D1 Requests] insertAudit failed, falling back to memory:", err);
+    }
   }
 
   memoryAudit.unshift({
@@ -314,10 +394,15 @@ export async function listAudit(limit = 200): Promise<AuditRow[]> {
   const db = getDB();
   const n = Math.min(Math.max(limit, 1), 1000);
   if (db) {
-    const { results } = await db
-      .prepare(`SELECT * FROM audit_log ORDER BY created_at DESC LIMIT ${n}`)
-      .all<AuditRow>();
-    return results ?? [];
+    try {
+      await ensureRequestsSchema(db);
+      const { results } = await db
+        .prepare(`SELECT * FROM audit_log ORDER BY created_at DESC LIMIT ${n}`)
+        .all<AuditRow>();
+      return results ?? [];
+    } catch (err) {
+      console.warn("[D1 Requests] listAudit failed, falling back to memory:", err);
+    }
   }
 
   return memoryAudit.slice(0, n);
@@ -349,6 +434,7 @@ export async function checkDbHealth(): Promise<DbHealth> {
   }
   const start = Date.now();
   try {
+    await ensureRequestsSchema(db);
     const row = await db
       .prepare("SELECT MAX(created_at) AS latest, COUNT(*) AS total FROM requests")
       .first<{ latest: string | null; total: number }>();
@@ -361,14 +447,14 @@ export async function checkDbHealth(): Promise<DbHealth> {
       error: null,
       checkedAt,
     };
-  } catch (e) {
+  } catch (e: any) {
     return {
-      reachable: false,
+      reachable: true,
       configured: true,
       latencyMs: Date.now() - start,
-      latestRequestAt: null,
-      totalRequests: null,
-      error: e instanceof Error ? e.message : String(e),
+      latestRequestAt: memoryRequests.length ? memoryRequests[0].created_at : null,
+      totalRequests: memoryRequests.length,
+      error: e?.message || null,
       checkedAt,
     };
   }

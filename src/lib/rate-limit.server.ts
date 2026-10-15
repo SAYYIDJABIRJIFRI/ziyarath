@@ -20,31 +20,35 @@ export async function checkAndRecord(ip: string): Promise<RateLimitResult> {
   const since = now - WINDOW_SECONDS;
 
   if (db) {
-    const row = await db
-      .prepare(
-        "SELECT COUNT(*) AS c, MIN(created_at) AS first FROM request_hits WHERE ip = ? AND created_at >= ?",
-      )
-      .bind(ip, since)
-      .first<{ c: number; first: number | null }>();
+    try {
+      const row = await db
+        .prepare(
+          "SELECT COUNT(*) AS c, MIN(created_at) AS first FROM request_hits WHERE ip = ? AND created_at >= ?",
+        )
+        .bind(ip, since)
+        .first<{ c: number; first: number | null }>();
 
-    const count = row?.c ?? 0;
-    if (count >= MAX_HITS) {
-      const first = row?.first ?? now;
-      return { ok: false, retryAfterSeconds: Math.max(1, first + WINDOW_SECONDS - now) };
+      const count = row?.c ?? 0;
+      if (count >= MAX_HITS) {
+        const first = row?.first ?? now;
+        return { ok: false, retryAfterSeconds: Math.max(1, first + WINDOW_SECONDS - now) };
+      }
+
+      await db
+        .prepare("INSERT INTO request_hits (ip, created_at) VALUES (?, ?)")
+        .bind(ip, now)
+        .run();
+
+      // Opportunistic cleanup — cheap, keeps table tiny.
+      await db
+        .prepare("DELETE FROM request_hits WHERE created_at < ?")
+        .bind(now - CLEANUP_OLDER_THAN)
+        .run();
+
+      return { ok: true, remaining: MAX_HITS - count - 1 };
+    } catch (err) {
+      console.warn("[D1 Rate Limit] D1 check failed, using memory fallback:", err);
     }
-
-    await db
-      .prepare("INSERT INTO request_hits (ip, created_at) VALUES (?, ?)")
-      .bind(ip, now)
-      .run();
-
-    // Opportunistic cleanup — cheap, keeps table tiny.
-    await db
-      .prepare("DELETE FROM request_hits WHERE created_at < ?")
-      .bind(now - CLEANUP_OLDER_THAN)
-      .run();
-
-    return { ok: true, remaining: MAX_HITS - count - 1 };
   }
 
   // In-memory rate limiter fallback
