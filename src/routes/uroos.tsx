@@ -195,9 +195,9 @@ export function getUroosRegion(u: DbUroos): Region {
   return "worldwide";
 }
 
-function classifyRegion(text: string, pageId?: string): Region {
+function classifyRegion(text: string, pageId?: string, dynamicList: DbUroos[] = []): Region {
   if (pageId) {
-    const found = ALL_DEDICATED_UROOS.find((u) => u.id === pageId);
+    const found = dynamicList.find((u) => u.id === pageId) || ALL_DEDICATED_UROOS.find((u) => u.id === pageId);
     if (found?.region) return found.region;
   }
   if (KERALA_KEYWORDS.some((k) => text.includes(k))) return "kerala";
@@ -215,22 +215,49 @@ export type Flat = {
   region: Region;
 };
 
-function flatten(months: UroosMonth[]): Flat[] {
+function buildMergedCalendar(months: UroosMonth[], dynamicList: DbUroos[]): Flat[] {
   const out: Flat[] = [];
+  const seenPageIds = new Set<string>();
+
   for (const m of months) {
     for (const d of m.days) {
       for (const e of d.entries) {
+        if (e.pageId) seenPageIds.add(e.pageId);
         out.push({
           month: m,
           day: d.day,
           text: e.text,
           url: e.url,
           pageId: e.pageId,
-          region: classifyRegion(e.text, e.pageId),
+          region: classifyRegion(e.text, e.pageId, dynamicList),
         });
       }
     }
   }
+
+  // Merge dynamic Uroos entries from D1 / CMS that don't have static entries in uroos.ts
+  for (const u of dynamicList) {
+    if (seenPageIds.has(u.id)) continue;
+    seenPageIds.add(u.id);
+
+    const m = months.find((mo) => mo.num === u.hijriMonth) || {
+      num: u.hijriMonth,
+      name: u.hijriMonthName || `Month ${u.hijriMonth}`,
+      days: [],
+    };
+
+    const text = u.malayalamTitle ? `${u.title} (${u.malayalamTitle})` : u.title;
+    out.push({
+      month: m,
+      day: u.hijriDay,
+      text,
+      url: u.sourceUrl || null,
+      pageId: u.id,
+      region: getUroosRegion(u),
+    });
+  }
+
+  out.sort((a, b) => a.month.num - b.month.num || a.day - b.day);
   return out;
 }
 
@@ -284,7 +311,7 @@ function UroosPage() {
     updateSearch({ q: val });
   };
 
-  const all = useMemo(() => flatten(UROOS_MONTHS), []);
+  const all = useMemo(() => buildMergedCalendar(UROOS_MONTHS, dynamicUroos), [dynamicUroos]);
   const totalEntries = all.length;
   const keralaCount = all.filter((e) => e.region === "kerala").length;
   const indiaCount = all.filter((e) => e.region === "india").length;
@@ -445,7 +472,7 @@ function UroosPage() {
               count={totalEntries}
             />
             {UROOS_MONTHS.map((m) => {
-              const count = m.days.reduce((n, d) => n + d.entries.length, 0);
+              const count = all.filter((e) => e.month.num === m.num).length;
               return (
                 <ChipButton
                   key={m.num}
@@ -557,6 +584,7 @@ function UroosPage() {
           {activeMonth ? (
             <MiniCalendar
               month={activeMonth}
+              entries={all.filter((e) => e.month.num === activeMonth.num)}
               selectedDay={selectedDay}
               onSelectDay={(d) => updateSearch({ day: d === selectedDay ? null : d })}
             />
@@ -745,16 +773,24 @@ function FilterPill({ label, onClear }: { label: string; onClear: () => void }) 
 
 function MiniCalendar({
   month,
+  entries = [],
   selectedDay,
   onSelectDay,
 }: {
   month: UroosMonth;
+  entries?: Flat[];
   selectedDay: number | null;
   onSelectDay: (d: number) => void;
 }) {
   const totalDays = month.num % 2 === 1 ? 30 : 29;
   const dayMap = new Map<number, number>();
-  for (const d of month.days) dayMap.set(d.day, d.entries.length);
+  if (entries.length > 0) {
+    for (const e of entries) {
+      dayMap.set(e.day, (dayMap.get(e.day) ?? 0) + 1);
+    }
+  } else {
+    for (const d of month.days) dayMap.set(d.day, d.entries.length);
+  }
 
   return (
     <Card className="p-4">
@@ -1220,14 +1256,14 @@ function EntryDialog({
 }) {
   const matchedUroos = entry
     ? (entry.pageId ? dynamicUroos.find((u) => u.id === entry.pageId) : null) ||
-      dynamicUroos.find(
-        (u) =>
-          u.id === entry.pageId ||
-          entry.text.toLowerCase().includes(u.title.toLowerCase()) ||
-          (u.malayalamTitle && entry.text.includes(u.malayalamTitle)) ||
-          (u.restingPerson && entry.text.toLowerCase().includes(u.restingPerson.toLowerCase())) ||
-          (entry.month.num === u.hijriMonth && entry.day === u.hijriDay)
-      )
+      dynamicUroos.find((u) => {
+        if (entry.pageId && u.id === entry.pageId) return true;
+        const entryLower = entry.text.toLowerCase();
+        const matchesTitle = Boolean(u.title && entryLower.includes(u.title.toLowerCase()));
+        const matchesMalayalam = Boolean(u.malayalamTitle && entry.text.includes(u.malayalamTitle));
+        const matchesSaint = Boolean(u.restingPerson && entryLower.includes(u.restingPerson.toLowerCase()));
+        return matchesTitle || matchesMalayalam || matchesSaint;
+      })
     : null;
 
   return (

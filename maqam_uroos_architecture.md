@@ -91,13 +91,13 @@ erDiagram
 | Uroos ID | Linked Maqam ID | Maqam Exists? |
 |----------|-----------------|---------------|
 | `mampuram-uroos` | `mampuram` | ✅ Yes |
-| `madavoor-uroos` | `madavoor` | ⚠️ **NO** — Missing maqam entry |
+| `madavoor-uroos` | `madavoor` | ✅ Yes |
 | `beemapally-uroos` | `beemapally` | ✅ Yes |
 | `ajmer-khwaja-muinuddin-uroos` | `ajmer` | ✅ Yes |
 | `kondotty-nercha` | `kondotty` | ✅ Yes |
 
-> [!WARNING]
-> **Broken Link:** The uroos `madavoor-uroos` references `maqamId: "madavoor"`, but there is no maqam with `id: "madavoor"` in [`maqams.ts`](file:///c:/Users/hp/Downloads/ziyarath/ziyarath-main/src/data/maqams.ts). This means the "Connected Maqam" card will not render on that uroos detail page.
+> [!NOTE]
+> **Resolved Link:** The uroos `madavoor-uroos` references `maqamId: "madavoor"`, which is now seeded in [`maqams.ts`](file:///c:/Users/hp/Downloads/ziyarath/ziyarath-main/src/data/maqams.ts) (`Madavoor C.M. Maqam Sharif`). All 5 connected Uroos events now resolve to valid host Maqams with bidirectional detail navigation.
 
 ---
 
@@ -105,7 +105,7 @@ erDiagram
 
 | File | Purpose | Entries |
 |------|---------|---------|
-| [`maqams.ts`](file:///c:/Users/hp/Downloads/ziyarath/ziyarath-main/src/data/maqams.ts) | Static seed data for 9 maqams | `MAQAMS: Maqam[]` |
+| [`maqams.ts`](file:///c:/Users/hp/Downloads/ziyarath/ziyarath-main/src/data/maqams.ts) | Static seed data for 11 maqams | `MAQAMS: Maqam[]` |
 | [`uroos.ts`](file:///c:/Users/hp/Downloads/ziyarath/ziyarath-main/src/data/uroos.ts) | Calendar data — hijri month/day entries with `pageId` links | `UROOS_MONTHS: UroosMonth[]` |
 | [`uroos-pages.ts`](file:///c:/Users/hp/Downloads/ziyarath/ziyarath-main/src/data/uroos-pages.ts) | Full dedicated page data for 27 uroos events | `ALL_DEDICATED_UROOS: DbUroos[]` |
 | [`content.ts`](file:///c:/Users/hp/Downloads/ziyarath/ziyarath-main/src/types/content.ts) | TypeScript types: `DbMaqam`, `DbUroos`, `PageAllotment`, `SystemUser` |
@@ -173,8 +173,11 @@ flowchart TB
 
 ---
 
-## ⚠️ Issues Found
+## ⚠️ Issues & Status
 
-1. **Missing Maqam:** `madavoor` referenced by `madavoor-uroos` doesn't exist in `maqams.ts`
-2. **Calendar → Page Linking:** The `uroos.ts` calendar uses `pageId` to link to `uroos-pages.ts` entries by ID. All 27 calendar entries have matching page entries.
-3. **Region field discrepancy:** Maqam uses 4 regions (`kerala | india | middle-east | worldwide`), Uroos uses 3 regions (`kerala | india | worldwide`). Middle-east uroos entries don't exist.
+1. **Missing Maqam (Resolved):** `madavoor` was added to `maqams.ts` (`Madavoor C.M. Maqam Sharif`). The `madavoor-uroos` page now renders the Connected Maqam banner seamlessly.
+2. **Calendar → Page Linking (Implemented & Hardened):**
+   - The `uroos.ts` calendar links to dedicated pages via `pageId`. All 27 calendar entries have matching page entries.
+   - Dynamic Uroos events from the database/CMS are automatically merged into the Calendar Grid, Timeline, and Day navigation views via `buildMergedCalendar`.
+   - In `EntryDialog`, the loose `(month, day)` date-collision matching heuristic has been replaced with strict entity text matching (title, Malayalam title, resting person) to prevent accidental cross-linking between unrelated saints on the same day.
+3. **Region Field Alignment:** Both Maqam and Uroos support 4 canonical regions (`kerala | india | middle-east | worldwide`), with dynamic region resolution via `getUroosRegion` and `classifyRegion`.
