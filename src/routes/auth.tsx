@@ -97,7 +97,11 @@ function AuthPage() {
         }
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Authentication failed";
+      let msg = err instanceof Error ? err.message : "Authentication failed";
+      if (msg.toLowerCase().includes("failed to fetch")) {
+        msg =
+          "Network error: Unable to reach authentication server. If you are using Brave Shields, an ad blocker (uBlock Origin), or a VPN, please disable it for this page and try again.";
+      }
       setError(msg);
       toast.error(msg);
     } finally {
