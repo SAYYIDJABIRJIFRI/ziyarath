@@ -287,7 +287,7 @@ function AdminHubPage() {
                   Manage Allotted Pages
                 </CardTitle>
                 <CardDescription className="mt-1.5 text-xs leading-relaxed">
-                  Edit and maintain pages assigned to you. Update visiting hours, festival dates, history, offerings, and contact details.
+                  Super Admins have full access across all pages. Page Admins have scoped access to edit only their allotted pages and media.
                 </CardDescription>
               </div>
             </CardHeader>

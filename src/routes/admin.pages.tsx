@@ -395,6 +395,7 @@ function AdminPagesManagement() {
           id: editItem.item.id,
           editorId: currentUserId,
           editorEmail: currentUserEmail,
+          editorRole: currentRole,
           data: payloadData,
         },
       });
@@ -455,7 +456,7 @@ function AdminPagesManagement() {
     <SiteLayout>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Navigation & Header */}
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight text-foreground">
@@ -468,13 +469,13 @@ function AdminPagesManagement() {
                     : "bg-emerald-600/20 text-emerald-600 border-emerald-600/30"
                 }
               >
-                {isSuperAdmin ? "Super Admin View" : "Allotted Admin View"}
+                {isSuperAdmin ? "Super Admin (All Pages)" : "Page Admin (Allotted Only)"}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
               {isSuperAdmin
-                ? "Full editing privileges across all Maqams and Uroos pages. Click 'Edit Page' to modify details and cover images."
-                : `Showing pages allotted to ${currentUserEmail} for editing, details, and image management.`}
+                ? "Full editing privileges across all Maqams and Uroos pages in the portal."
+                : `Showing only pages allotted to ${currentUserEmail} for editing and maintenance.`}
             </p>
           </div>
 
@@ -483,23 +484,23 @@ function AdminPagesManagement() {
             <div className="inline-flex rounded-lg border border-border bg-card p-1 text-xs">
               <button
                 onClick={() => handleRoleSwitch("super_admin")}
-                className={`px-2.5 py-1 rounded-md transition-all ${
+                className={`px-3 py-1 rounded-md transition-all ${
                   currentRole === "super_admin"
-                    ? "bg-primary text-primary-foreground font-semibold"
+                    ? "bg-primary text-primary-foreground font-semibold shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Super Admin
+                Super Admin (All Pages)
               </button>
               <button
                 onClick={() => handleRoleSwitch("admin")}
-                className={`px-2.5 py-1 rounded-md transition-all ${
+                className={`px-3 py-1 rounded-md transition-all ${
                   currentRole === "admin"
-                    ? "bg-primary text-primary-foreground font-semibold"
+                    ? "bg-primary text-primary-foreground font-semibold shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Page Admin
+                Page Admin (Allotted Only)
               </button>
             </div>
 
@@ -525,6 +526,33 @@ function AdminPagesManagement() {
             )}
           </div>
         </div>
+
+        {/* Access level informative banner */}
+        {!isSuperAdmin ? (
+          <div className="mb-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-950 dark:text-emerald-200">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+              <span>
+                <strong>Page Admin Mode:</strong> You can access, view, and edit <strong>only pages allotted to your account</strong> ({currentUserEmail}). Non-allotted pages are restricted.
+              </span>
+            </div>
+            <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 shrink-0 w-fit">
+              {totalPagesCount} Allotted {totalPagesCount === 1 ? "Page" : "Pages"}
+            </Badge>
+          </div>
+        ) : (
+          <div className="mb-6 rounded-lg border border-primary/30 bg-primary/5 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-primary-950 dark:text-primary-200">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
+              <span>
+                <strong>Super Admin Mode:</strong> Unrestricted access across all {totalPagesCount} portal pages, full allotments delegation, and request approvals.
+              </span>
+            </div>
+            <Badge className="bg-primary text-primary-foreground shrink-0 w-fit">
+              Super Admin Authority
+            </Badge>
+          </div>
+        )}
 
         {/* Filter bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
