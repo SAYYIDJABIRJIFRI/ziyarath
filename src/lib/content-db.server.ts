@@ -721,14 +721,14 @@ export async function listSystemUsers(): Promise<SystemUser[]> {
 }
 
 export async function getUserRole(userId: string, email?: string | null): Promise<"super_admin" | "admin" | "user"> {
-  // Only superadmin accounts have super_admin role
-  if (email && email.toLowerCase().includes("superadmin")) {
+  // If email matches primary super admin or starts with superadmin
+  if (email && (email.toLowerCase().includes("superadmin") || email.toLowerCase() === "admin@ziyarath.com")) {
     return "super_admin";
   }
   const users = await listSystemUsers();
   const match = users.find((u) => u.userId === userId || (email && u.userEmail.toLowerCase() === email.toLowerCase()));
   if (match) return match.role;
-  // Default to page admin for registered system users
+  // Default to admin for registered users in demo environment
   return "admin";
 }
 
@@ -813,9 +813,9 @@ export async function approveRequestAndCreate(
       coverImage: data.coverImage || "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=1200",
       visitingHours: data.visitingHoursText
         ? data.visitingHoursText.split("\n").map((line) => {
-            const [label, hours] = line.split(":");
-            return { label: (label || "Visiting").trim(), hours: (hours || label).trim() };
-          })
+          const [label, hours] = line.split(":");
+          return { label: (label || "Visiting").trim(), hours: (hours || label).trim() };
+        })
         : [{ label: "General Visiting", hours: "Open daily from Fajr to Isha" }],
       facilities: data.facilitiesText
         ? data.facilitiesText.split(",").map((s) => s.trim()).filter(Boolean)
@@ -853,9 +853,9 @@ export async function approveRequestAndCreate(
       significance: data.significance || undefined,
       programSchedule: data.programScheduleText
         ? data.programScheduleText.split("\n").map((line) => {
-            const [time, event] = line.split("-");
-            return { time: (time || "").trim(), event: (event || time).trim() };
-          })
+          const [time, event] = line.split("-");
+          return { time: (time || "").trim(), event: (event || time).trim() };
+        })
         : [{ time: "Daily", event: "Spiritual gatherings and Mawlid" }],
       nerchaOfferings: data.nerchaOfferings || "Traditional community feast and offerings.",
       organizerName: data.organizerName || undefined,
