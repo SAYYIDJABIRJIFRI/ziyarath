@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import {
   ShieldCheck,
+  ShieldAlert,
   Building2,
   Sparkles,
   UserCheck,
@@ -106,6 +107,35 @@ function AdminAllotmentsPage() {
     }
   };
 
+  const [currentUserEmail, setCurrentUserEmail] = useState("superadmin@ziyarath.com");
+
+  // Session detection & Super Admin restriction
+  useEffect(() => {
+    let mounted = true;
+    const check = async () => {
+      try {
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 800));
+        const res: any = await Promise.race([sessionPromise, timeoutPromise]);
+        if (!mounted) return;
+        const email = res?.data?.session?.user?.email;
+        if (email) {
+          setCurrentUserEmail(email);
+          if (!email.toLowerCase().includes("superadmin")) {
+            toast.error("Allotments management is only for Super Admins. Redirected to /admin/pages.");
+            navigate({ to: "/admin/pages" });
+          }
+        }
+      } catch {
+        // Non-blocking
+      }
+    };
+    check();
+    return () => {
+      mounted = false;
+    };
+  }, [navigate]);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -154,7 +184,7 @@ function AdminAllotmentsPage() {
           targetId: selectedTargetId,
           targetTitle,
           assignedBy: "superadmin-system",
-          assignedByEmail: "superadmin@ziyarath.com",
+          assignedByEmail: currentUserEmail,
           notes: notes.trim() || undefined,
         },
       });
@@ -181,6 +211,38 @@ function AdminAllotmentsPage() {
       toast.error(err instanceof Error ? err.message : "Failed to revoke");
     }
   };
+
+  const isSuperAdmin = currentUserEmail.toLowerCase().includes("superadmin");
+
+  if (!isSuperAdmin) {
+    return (
+      <SiteLayout>
+        <div className="mx-auto max-w-xl px-4 py-20 text-center">
+          <Card className="p-8 border-dashed shadow-sm">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600">
+              <ShieldAlert className="h-7 w-7" />
+            </div>
+            <Badge className="mb-3 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-xs">
+              Super Admin Access Only
+            </Badge>
+            <h2 className="text-xl font-bold text-foreground">
+              Page Allotments is Restricted
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Allotting pages and managing administrative assignments is restricted to <strong>Super Admins</strong>. As a Page Admin ({currentUserEmail}), you can only access and edit your allotted pages.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Link to="/admin/pages">
+                  Go to My Allotted Pages
+                </Link>
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </SiteLayout>
+    );
+  }
 
   return (
     <SiteLayout>

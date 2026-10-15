@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ export const Route = createFileRoute("/admin/")({
 });
 
 function AdminHubPage() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [maqams, setMaqams] = useState<DbMaqam[]>([]);
   const [uroosList, setUroosList] = useState<DbUroos[]>([]);

@@ -51,6 +51,7 @@ import {
   Compass,
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import {
   getMyManagedPagesFn,
@@ -174,6 +175,34 @@ function AdminPagesManagement() {
       setLoading(false);
     }
   };
+
+  // Automatically detect logged-in Supabase session on mount
+  useEffect(() => {
+    let mounted = true;
+    const detectSession = async () => {
+      try {
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 800));
+        const res: any = await Promise.race([sessionPromise, timeoutPromise]);
+        if (!mounted) return;
+        const email = res?.data?.session?.user?.email;
+        if (email) {
+          const isSuper = email.toLowerCase().includes("superadmin");
+          const role = isSuper ? "super_admin" : "admin";
+          const uid = `usr-${email.toLowerCase().replace(/[^a-z0-9]/gi, "")}`;
+          setCurrentUserEmail(email);
+          setCurrentUserId(uid);
+          setCurrentRole(role);
+        }
+      } catch {
+        // Non-blocking
+      }
+    };
+    detectSession();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     loadData(currentRole, currentUserEmail, currentUserId);
@@ -519,24 +548,40 @@ function AdminPagesManagement() {
               </button>
             </div>
 
-            <Button asChild variant="outline" size="sm">
-              <Link to="/admin">
-                <ShieldCheck className="mr-1.5 h-4 w-4" />
-                Admin Hub
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/admin/requests">
-                <Inbox className="mr-1.5 h-4 w-4" />
-                Requests
-              </Link>
-            </Button>
-            {isSuperAdmin && (
-              <Button asChild variant="outline" size="sm">
-                <Link to="/admin/allotments">
-                  <ShieldCheck className="mr-1.5 h-4 w-4" />
-                  Allotments
-                </Link>
+            {isSuperAdmin ? (
+              <>
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/admin">
+                    <ShieldCheck className="mr-1.5 h-4 w-4" />
+                    Admin Hub
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/admin/requests">
+                    <Inbox className="mr-1.5 h-4 w-4" />
+                    Requests
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/admin/allotments">
+                    <ShieldCheck className="mr-1.5 h-4 w-4" />
+                    Allotments
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  supabase.auth.signOut().then(() => {
+                    toast.success("Signed out successfully");
+                    window.location.href = "/auth";
+                  });
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Sign out ({currentUserEmail})
               </Button>
             )}
           </div>
