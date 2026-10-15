@@ -69,6 +69,14 @@ const seedUsers: SystemUser[] = [
     role: "admin",
     displayName: "Malabar Regional Admin",
     createdAt: "2026-01-01T00:00:00.000Z",
+  },
+  {
+    id: "usr-003",
+    userId: "newadmin-001",
+    userEmail: "newadmin@ziyarath.com",
+    role: "admin",
+    displayName: "New Page Admin (Unallotted)",
+    createdAt: "2026-01-01T00:00:00.000Z",
   }
 ];
 
