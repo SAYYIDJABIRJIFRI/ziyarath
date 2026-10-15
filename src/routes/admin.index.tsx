@@ -54,6 +54,20 @@ function AdminHubPage() {
 
   useEffect(() => {
     let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      const email = data?.session?.user?.email;
+      if (email && !email.toLowerCase().includes("superadmin")) {
+        navigate({ to: "/admin/pages" });
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [navigate]);
+
+  useEffect(() => {
+    let mounted = true;
     async function fetchStats() {
       try {
         const [m, u, a, r] = await Promise.all([
