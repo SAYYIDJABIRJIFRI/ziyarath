@@ -32,16 +32,24 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
+  const redirectUser = (userEmail?: string | null) => {
+    if (userEmail && userEmail.toLowerCase().includes("superadmin")) {
+      navigate({ to: "/admin" });
+    } else {
+      navigate({ to: "/admin/pages" });
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
-        navigate({ to: "/admin/requests" });
+        redirectUser(data.session.user?.email);
       }
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        navigate({ to: "/admin/requests" });
+        redirectUser(session.user?.email);
       }
     });
 
@@ -75,7 +83,7 @@ function AuthPage() {
             refresh_token: res.session.refresh_token,
           });
           toast.success("Account created successfully!");
-          navigate({ to: "/admin/requests" });
+          redirectUser(res.session.user?.email || email.trim());
         } else {
           const infoMsg =
             res.info ||
@@ -101,7 +109,7 @@ function AuthPage() {
             refresh_token: res.session.refresh_token,
           });
           toast.success("Signed in successfully!");
-          navigate({ to: "/admin/requests" });
+          redirectUser(res.session.user?.email || email.trim());
         }
       }
     } catch (err) {
