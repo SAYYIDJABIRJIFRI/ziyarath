@@ -56,53 +56,56 @@ function AuthPage() {
     setError(null);
     setInfo(null);
 
-    const redirectOrigin =
-      typeof window !== "undefined" ? `${window.location.origin}/admin/requests` : "/admin/requests";
-
     try {
       if (mode === "signup") {
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: {
-              full_name: fullName.trim() || undefined,
-            },
-            emailRedirectTo: redirectOrigin,
+        // Use server function (runs on Cloudflare Worker, eliminating browser CORS/ISP issues)
+        const res = await serverSignUpFn({
+          data: {
+            email: email.trim(),
+            password,
+            fullName: fullName.trim() || undefined,
           },
         });
 
-        if (signUpError) throw signUpError;
+        if (res.error) throw new Error(res.error);
 
-        if (data.session) {
+        if (res.session) {
+          await supabase.auth.setSession({
+            access_token: res.session.access_token,
+            refresh_token: res.session.refresh_token,
+          });
           toast.success("Account created successfully!");
           navigate({ to: "/admin/requests" });
         } else {
-          setInfo(
-            "Account created! Please check your email inbox if email confirmation is required, then sign in.",
-          );
-          toast.success("Account created! Please check your email or proceed to sign in.");
+          const infoMsg =
+            res.info ||
+            "Account created! Please check your email inbox if email confirmation is required, then sign in.";
+          setInfo(infoMsg);
+          toast.success(res.info || "Account created! Proceed to sign in.");
           setMode("signin");
         }
       } else {
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
+        // Use server function for signing in
+        const res = await serverSignInFn({
+          data: {
+            email: email.trim(),
+            password,
+          },
         });
 
-        if (signInError) throw signInError;
+        if (res.error) throw new Error(res.error);
 
-        if (data.session) {
+        if (res.session) {
+          await supabase.auth.setSession({
+            access_token: res.session.access_token,
+            refresh_token: res.session.refresh_token,
+          });
           toast.success("Signed in successfully!");
           navigate({ to: "/admin/requests" });
         }
       }
     } catch (err) {
-      let msg = err instanceof Error ? err.message : "Authentication failed";
-      if (msg.toLowerCase().includes("failed to fetch")) {
-        msg =
-          "Network error: Unable to reach authentication server. If you are using Brave Shields, an ad blocker (uBlock Origin), or a VPN, please disable it for this page and try again.";
-      }
+      const msg = err instanceof Error ? err.message : "Authentication failed";
       setError(msg);
       toast.error(msg);
     } finally {
