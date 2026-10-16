@@ -729,8 +729,8 @@ export async function listSystemUsers(): Promise<SystemUser[]> {
 }
 
 export async function getUserRole(userId: string, email?: string | null): Promise<"super_admin" | "admin" | "user"> {
-  // If email matches primary super admin or starts with superadmin
-  if (email && (email.toLowerCase().includes("superadmin") || email.toLowerCase() === "admin@ziyarath.com")) {
+  // If email matches super admin
+  if (email && email.toLowerCase().includes("superadmin")) {
     return "super_admin";
   }
   const users = await listSystemUsers();

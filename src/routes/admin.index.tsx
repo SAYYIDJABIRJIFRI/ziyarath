@@ -56,8 +56,11 @@ function AdminHubPage() {
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
-      const email = data?.session?.user?.email;
-      if (email && !email.toLowerCase().includes("superadmin")) {
+      const userObj = data?.session?.user;
+      const email = userObj?.email;
+      const metaRole = userObj?.app_metadata?.role || userObj?.user_metadata?.role;
+      const isSuper = (email && email.toLowerCase().includes("superadmin")) || metaRole === "super_admin";
+      if (email && !isSuper) {
         navigate({ to: "/admin/pages" });
       }
     });

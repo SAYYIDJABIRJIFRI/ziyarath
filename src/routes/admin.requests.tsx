@@ -244,10 +244,13 @@ function AdminRequestsPage() {
         const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 800));
         const res: any = await Promise.race([sessionPromise, timeoutPromise]);
         if (!mounted) return;
-        const email = res?.data?.session?.user?.email;
+        const userObj = res?.data?.session?.user;
+        const email = userObj?.email;
         if (email) {
           setCurrentUserEmail(email);
-          if (!email.toLowerCase().includes("superadmin")) {
+          const metaRole = userObj?.app_metadata?.role || userObj?.user_metadata?.role;
+          const isSuper = email.toLowerCase().includes("superadmin") || metaRole === "super_admin";
+          if (!isSuper) {
             toast.error("Requests Queue is only for Super Admins. Redirected to /admin/pages.");
             navigate({ to: "/admin/pages" });
           }

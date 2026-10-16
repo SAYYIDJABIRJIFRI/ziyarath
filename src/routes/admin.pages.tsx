@@ -187,12 +187,14 @@ function AdminPagesManagement() {
         const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 800));
         const res: any = await Promise.race([sessionPromise, timeoutPromise]);
         if (!mounted) return;
-        const email = res?.data?.session?.user?.email;
+        const userObj = res?.data?.session?.user;
+        const email = userObj?.email;
         if (email) {
           setAuthenticatedEmail(email);
-          const isSuper = email.toLowerCase().includes("superadmin");
+          const metaRole = userObj?.app_metadata?.role || userObj?.user_metadata?.role;
+          const isSuper = email.toLowerCase().includes("superadmin") || metaRole === "super_admin";
           const role = isSuper ? "super_admin" : "admin";
-          const uid = `usr-${email.toLowerCase().replace(/[^a-z0-9]/gi, "")}`;
+          const uid = userObj?.id || `usr-${email.toLowerCase().replace(/[^a-z0-9]/gi, "")}`;
           setCurrentUserEmail(email);
           setCurrentUserId(uid);
           setCurrentRole(role);
@@ -208,8 +210,8 @@ function AdminPagesManagement() {
   }, []);
 
   const isRealSuperAdmin = authenticatedEmail
-    ? authenticatedEmail.toLowerCase().includes("superadmin")
-    : currentUserEmail.toLowerCase().includes("superadmin");
+    ? authenticatedEmail.toLowerCase().includes("superadmin") || currentRole === "super_admin"
+    : currentUserEmail.toLowerCase().includes("superadmin") || currentRole === "super_admin";
 
   useEffect(() => {
     loadData(currentRole, currentUserEmail, currentUserId);

@@ -32,8 +32,11 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  const redirectUser = (userEmail?: string | null) => {
-    if (userEmail && userEmail.toLowerCase().includes("superadmin")) {
+  const redirectUser = (userOrEmail?: any) => {
+    const email = typeof userOrEmail === "string" ? userOrEmail : userOrEmail?.email;
+    const role = typeof userOrEmail === "object" ? (userOrEmail?.app_metadata?.role || userOrEmail?.user_metadata?.role) : null;
+    const isSuper = (email && email.toLowerCase().includes("superadmin")) || role === "super_admin";
+    if (isSuper) {
       navigate({ to: "/admin" });
     } else {
       navigate({ to: "/admin/pages" });
@@ -42,14 +45,14 @@ function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        redirectUser(data.session.user?.email);
+      if (data.session?.user) {
+        redirectUser(data.session.user);
       }
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        redirectUser(session.user?.email);
+      if (session?.user) {
+        redirectUser(session.user);
       }
     });
 

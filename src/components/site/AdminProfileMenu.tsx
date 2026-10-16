@@ -168,8 +168,9 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
   }
 
   const email = user.email || "";
-  const isSuperAdmin = email.toLowerCase().includes("superadmin");
-  const isUnallotted = email.toLowerCase().includes("newadmin");
+  const metaRole = user.app_metadata?.role || user.user_metadata?.role;
+  const isSuperAdmin = email.toLowerCase().includes("superadmin") || metaRole === "super_admin";
+  const isUnallotted = email.toLowerCase().includes("newadmin") || metaRole === "unallotted_admin";
 
   const fullName =
     user.user_metadata?.full_name ||
