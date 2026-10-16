@@ -176,6 +176,8 @@ function AdminPagesManagement() {
     }
   };
 
+  const [authenticatedEmail, setAuthenticatedEmail] = useState<string | null>(null);
+
   // Automatically detect logged-in Supabase session on mount
   useEffect(() => {
     let mounted = true;
@@ -187,6 +189,7 @@ function AdminPagesManagement() {
         if (!mounted) return;
         const email = res?.data?.session?.user?.email;
         if (email) {
+          setAuthenticatedEmail(email);
           const isSuper = email.toLowerCase().includes("superadmin");
           const role = isSuper ? "super_admin" : "admin";
           const uid = `usr-${email.toLowerCase().replace(/[^a-z0-9]/gi, "")}`;
@@ -204,11 +207,19 @@ function AdminPagesManagement() {
     };
   }, []);
 
+  const isRealSuperAdmin = authenticatedEmail
+    ? authenticatedEmail.toLowerCase().includes("superadmin")
+    : currentUserEmail.toLowerCase().includes("superadmin");
+
   useEffect(() => {
     loadData(currentRole, currentUserEmail, currentUserId);
   }, [currentRole, currentUserEmail, currentUserId]);
 
   const handleRoleSwitch = (persona: "super_admin" | "allotted_admin" | "unallotted_admin") => {
+    if (!isRealSuperAdmin) {
+      toast.error("Permission Denied: Only Super Admins can switch access personas.");
+      return;
+    }
     let mockData = null;
     if (persona === "super_admin") {
       setCurrentRole("super_admin");
@@ -537,39 +548,59 @@ function AdminPagesManagement() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Role switch toggle */}
-            <div className="inline-flex rounded-lg border border-border bg-card p-1 text-xs">
-              <button
-                onClick={() => handleRoleSwitch("super_admin")}
-                className={`px-2.5 py-1 rounded-md transition-all ${
-                  currentUserEmail === "superadmin@ziyarath.com"
-                    ? "bg-primary text-primary-foreground font-semibold shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Super Admin
-              </button>
-              <button
-                onClick={() => handleRoleSwitch("allotted_admin")}
-                className={`px-2.5 py-1 rounded-md transition-all ${
-                  currentUserEmail === "admin@ziyarath.com"
-                    ? "bg-primary text-primary-foreground font-semibold shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Allotted Admin
-              </button>
-              <button
-                onClick={() => handleRoleSwitch("unallotted_admin")}
-                className={`px-2.5 py-1 rounded-md transition-all ${
-                  currentUserEmail === "newadmin@ziyarath.com"
-                    ? "bg-primary text-primary-foreground font-semibold shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                New Admin (Unallotted)
-              </button>
-            </div>
+            {/* Role switch toggle: Super Admin can access all 3; Allotted Admin only accesses Allotted Admin; New Admin only accesses New Admin */}
+            {isRealSuperAdmin ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-muted-foreground hidden sm:inline">
+                  Super Admin View:
+                </span>
+                <div className="inline-flex rounded-lg border border-border bg-card p-1 text-xs">
+                  <button
+                    onClick={() => handleRoleSwitch("super_admin")}
+                    className={`px-2.5 py-1 rounded-md transition-all ${
+                      currentUserEmail === "superadmin@ziyarath.com"
+                        ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    title="Super Admin Master Access"
+                  >
+                    Super Admin
+                  </button>
+                  <button
+                    onClick={() => handleRoleSwitch("allotted_admin")}
+                    className={`px-2.5 py-1 rounded-md transition-all ${
+                      currentUserEmail === "admin@ziyarath.com"
+                        ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    title="Allotted Admin Access"
+                  >
+                    Allotted Admin
+                  </button>
+                  <button
+                    onClick={() => handleRoleSwitch("unallotted_admin")}
+                    className={`px-2.5 py-1 rounded-md transition-all ${
+                      currentUserEmail === "newadmin@ziyarath.com"
+                        ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    title="New Admin (Unallotted) Access"
+                  >
+                    New Admin (Unallotted)
+                  </button>
+                </div>
+              </div>
+            ) : totalPagesCount > 0 ? (
+              <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-300 font-medium">
+                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                <span>Allotted Admin Access Only</span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-800 dark:text-amber-300 font-medium">
+                <Lock className="h-4 w-4 text-amber-600" />
+                <span>New Admin (Unallotted) Access Only</span>
+              </div>
+            )}
 
             {isSuperAdmin ? (
               <>
@@ -611,13 +642,24 @@ function AdminPagesManagement() {
         </div>
 
         {/* Access level informative banner */}
-        {!isSuperAdmin ? (
+        {isSuperAdmin ? (
+          <div className="mb-6 rounded-lg border border-primary/30 bg-primary/5 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-primary-950 dark:text-primary-200">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
+              <span>
+                <strong>Super Admin Access:</strong> Master authority across all {totalPagesCount} portal pages. Super Admins are allowed to access Super Admin access, Allotted Admin view, and New Admin (Unallotted) view.
+              </span>
+            </div>
+            <Badge className="bg-primary text-primary-foreground shrink-0 w-fit">
+              Super Admin Authority
+            </Badge>
+          </div>
+        ) : totalPagesCount > 0 ? (
           <div className="mb-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-950 dark:text-emerald-200">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
               <span>
-                <strong>Page Admin Mode:</strong> You can view and edit <strong>only pages allotted to your account</strong> ({currentUserEmail}). Non-allotted pages are restricted.
-                {totalPagesCount === 0 && " (You currently have only an active login account with 0 pages allotted)."}
+                <strong>Allotted Admin Access Only:</strong> You have access strictly to pages allotted to your account ({currentUserEmail}). Non-allotted pages, Super Admin controls, and unallotted modes are restricted.
               </span>
             </div>
             <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 shrink-0 w-fit">
@@ -625,15 +667,15 @@ function AdminPagesManagement() {
             </Badge>
           </div>
         ) : (
-          <div className="mb-6 rounded-lg border border-primary/30 bg-primary/5 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-primary-950 dark:text-primary-200">
+          <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-950 dark:text-amber-200">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
+              <Lock className="h-4 w-4 text-amber-600 shrink-0" />
               <span>
-                <strong>Super Admin Mode:</strong> Unrestricted access across all {totalPagesCount} portal pages, full allotments delegation, and request approvals.
+                <strong>New Admin (Unallotted) Access Only:</strong> You currently have an active verified login account ({currentUserEmail}) with 0 pages allotted. A Super Admin must assign pages before you can edit content.
               </span>
             </div>
-            <Badge className="bg-primary text-primary-foreground shrink-0 w-fit">
-              Super Admin Authority
+            <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300 shrink-0 w-fit">
+              0 Pages Allotted
             </Badge>
           </div>
         )}

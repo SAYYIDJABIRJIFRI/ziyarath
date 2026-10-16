@@ -169,11 +169,17 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
 
   const email = user.email || "";
   const isSuperAdmin = email.toLowerCase().includes("superadmin");
+  const isUnallotted = email.toLowerCase().includes("newadmin");
+
   const fullName =
     user.user_metadata?.full_name ||
     user.user_metadata?.name ||
-    email.split("@")[0] ||
-    "Admin";
+    (isSuperAdmin
+      ? "Super Administrator"
+      : isUnallotted
+      ? "New Admin (Unallotted)"
+      : "Allotted Page Admin");
+
   const initials = fullName
     .split(" ")
     .map((n: string) => n[0])
@@ -181,8 +187,18 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
     .slice(0, 2)
     .toUpperCase() || "A";
 
-  const roleTitle = isSuperAdmin ? "Super Admin" : "Page Admin";
-  const roleSubtitle = isSuperAdmin ? "Master Authority" : "Allotted Pages Only";
+  const roleTitle = isSuperAdmin
+    ? "Super Admin"
+    : isUnallotted
+    ? "New Admin (Unallotted)"
+    : "Allotted Admin";
+
+  const roleSubtitle = isSuperAdmin
+    ? "Master Authority"
+    : isUnallotted
+    ? "New Admin Access Only"
+    : "Allotted Admin Access Only";
+
   const userId = user.id || `usr-${email.toLowerCase().replace(/[^a-z0-9]/gi, "")}`;
 
   return (
@@ -199,6 +215,8 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
                   className={
                     isSuperAdmin
                       ? "bg-primary/20 text-primary font-bold"
+                      : isUnallotted
+                      ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold"
                       : "bg-emerald-600/20 text-emerald-600 font-bold"
                   }
                 >
@@ -218,6 +236,8 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
               className={`hidden md:inline-flex text-[10px] px-1.5 py-0 h-4 border leading-none font-normal ${
                 isSuperAdmin
                   ? "bg-primary/10 text-primary border-primary/30"
+                  : isUnallotted
+                  ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
                   : "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
               }`}
             >
@@ -237,6 +257,8 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
                   className={
                     isSuperAdmin
                       ? "bg-primary text-primary-foreground font-bold text-sm"
+                      : isUnallotted
+                      ? "bg-amber-600 text-white font-bold text-sm"
                       : "bg-emerald-600 text-white font-bold text-sm"
                   }
                 >
@@ -256,6 +278,8 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
                     className={`text-[10px] px-1.5 py-0 border leading-tight ${
                       isSuperAdmin
                         ? "bg-primary/20 text-primary border-primary/40 font-semibold"
+                        : isUnallotted
+                        ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40 font-semibold"
                         : "bg-emerald-600/20 text-emerald-600 border-emerald-600/40 font-semibold"
                     }`}
                   >
@@ -459,10 +483,16 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
                   className={
                     isSuperAdmin
                       ? "bg-primary text-primary-foreground text-xs"
+                      : isUnallotted
+                      ? "bg-amber-500 text-white text-xs"
                       : "bg-emerald-600 text-white text-xs"
                   }
                 >
-                  {isSuperAdmin ? "Super Admin (Unrestricted)" : "Page Admin (Scoped)"}
+                  {isSuperAdmin
+                    ? "Super Admin (Unrestricted)"
+                    : isUnallotted
+                    ? "New Admin (Unallotted Access Only)"
+                    : "Allotted Admin (Scoped Access Only)"}
                 </Badge>
               </div>
 
@@ -472,8 +502,10 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
                 </span>
                 <p className="text-xs text-foreground/80 leading-relaxed">
                   {isSuperAdmin
-                    ? "Full master control: ability to review and approve community requests, delegate page allotments to administrators, and edit any live Maqam or Uroos page."
-                    : "Scoped caretaker access: can view, edit, and maintain only the specific Maqam and Uroos pages allotted by Super Admins. Requests and Allotments pages are restricted."}
+                    ? "Full master control: Super Admins are allowed to access Super Admin access, Allotted Admin access, and New Admin (Unallotted) preview access across all pages, requests, and allotments."
+                    : isUnallotted
+                    ? "New Admin (Unallotted) access ONLY: You have an active verified login account with 0 pages allotted. Super Admin controls and Allotted Admin pages are restricted until pages are delegated by a Super Admin."
+                    : "Allotted Admin access ONLY: You can view, edit, and maintain only pages allotted to your account. Super Admin controls and unallotted modes are restricted."}
                 </p>
               </div>
             </div>
