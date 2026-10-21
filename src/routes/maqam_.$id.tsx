@@ -47,6 +47,7 @@ import {
 
 import { getMaqamPublicDetailFn } from "@/lib/content.functions";
 import type { DbUroos } from "@/types/content";
+import { getSubdomainForMaqam, ROOT_DOMAIN, getUroosUrl } from "@/lib/subdomain-config";
 
 export const Route = createFileRoute("/maqam_/$id")({
   loader: async ({ params }) => {
@@ -62,9 +63,12 @@ export const Route = createFileRoute("/maqam_/$id")({
       };
     }
     const SITE = "https://ziyarath.com";
+    const subdomain = getSubdomainForMaqam(params.id);
     const title = `${m.name} — Ziyarath`;
     const description = m.description.slice(0, 155);
-    const url = `${SITE}/maqam/${params.id}`;
+    const url = subdomain
+      ? `https://${subdomain}.${ROOT_DOMAIN}/maqam`
+      : `${SITE}/maqam/${params.id}`;
 
     // Build FAQ entries from structured content where relevant.
     const faqEntries: { question: string; answer: string }[] = [];
@@ -465,10 +469,21 @@ function MaqamDetailPage() {
                           </p>
                         </div>
                         <Button asChild className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
-                          <Link to="/uroos/$id" params={{ id: u.id }}>
-                            View Uroos Page
-                            <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
-                          </Link>
+                        {(() => {\r
+                          const uUrl = getUroosUrl(u.id);\r
+                          const isSdUroos = uUrl.startsWith("http");\r
+                          return isSdUroos ? (\r
+                            <a href={uUrl}>\r
+                              View Uroos Page\r
+                              <ExternalLink className="ml-1.5 h-3.5 w-3.5" />\r
+                            </a>\r
+                          ) : (\r
+                            <Link to="/uroos/$id" params={{ id: u.id }}>\r
+                              View Uroos Page\r
+                              <ExternalLink className="ml-1.5 h-3.5 w-3.5" />\r
+                            </Link>\r
+                          );\r
+                        })()}
                         </Button>
                       </div>
                     </Card>

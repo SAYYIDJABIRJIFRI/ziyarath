@@ -66,13 +66,72 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   return brandedErrorResponse();
 }
 
+/**
+ * Subdomain URL rewriting.
+ * When a registered subdomain is detected (e.g. mampuram.ziyarath.com):
+ *   /maqam  → /maqam/mampuram  (the maqam detail page)
+ *   /uroos  → /uroos/mampuram-uroos  (the uroos detail page)
+ *   /       → 302 redirect to /maqam on the same subdomain
+ *
+ * All other paths (assets, API calls, etc.) pass through unchanged.
+ */
+function rewriteForSubdomain(request: Request): Request | Response | null {
+  const url = new URL(request.url);
+  const host = url.hostname;
+
+  // Quick exit for non-subdomain requests
+  const ROOT_DOMAIN = "ziyarath.com";
+  if (!host.endsWith(`.${ROOT_DOMAIN}`)) return null;
+
+  const prefix = host.slice(0, -(ROOT_DOMAIN.length + 1));
+  if (!prefix || prefix === "www") return null;
+
+  // Inline registry lookup (avoids importing ESM in the worker entrypoint scope)
+  const SUBDOMAIN_REGISTRY: Record<string, { maqamId: string; uroosId: string | null }> = {
+    mampuram: { maqamId: "mampuram", uroosId: "mampuram-uroos" },
+    // Add more here to match src/lib/subdomain-config.ts
+  };
+
+  const entry = SUBDOMAIN_REGISTRY[prefix];
+  if (!entry) return null;
+
+  const pathname = url.pathname;
+
+  // Redirect root to /maqam on the subdomain
+  if (pathname === "/" || pathname === "") {
+    url.pathname = "/maqam";
+    return Response.redirect(url.toString(), 302);
+  }
+
+  // Rewrite /maqam → /maqam/{maqamId}
+  if (pathname === "/maqam" || pathname === "/maqam/") {
+    url.pathname = `/maqam/${entry.maqamId}`;
+    return new Request(url.toString(), request);
+  }
+
+  // Rewrite /uroos → /uroos/{uroosId}
+  if ((pathname === "/uroos" || pathname === "/uroos/") && entry.uroosId) {
+    url.pathname = `/uroos/${entry.uroosId}`;
+    return new Request(url.toString(), request);
+  }
+
+  // All other paths (static assets, API, etc.) pass through unchanged
+  return null;
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       // Expose Cloudflare bindings (D1, KV, etc.) to server-only modules.
       (globalThis as { __CF_ENV__?: unknown }).__CF_ENV__ = env;
+
+      // --- Subdomain routing ---
+      const rewritten = rewriteForSubdomain(request);
+      if (rewritten instanceof Response) return rewritten; // redirect
+      const effectiveRequest = rewritten ?? request;
+
       const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
+      const response = await handler.fetch(effectiveRequest, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
       console.error(error);

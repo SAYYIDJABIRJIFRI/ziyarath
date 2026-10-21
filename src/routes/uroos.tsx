@@ -40,6 +40,7 @@ import {
 import { cn } from "@/lib/utils";
 import { RequestDialog } from "@/components/site/RequestDialog";
 import { REGION_LABELS, type MaqamRegion } from "@/data/maqams";
+import { getMaqamUrl, getUroosUrl, isSubdomainMaqam, isSubdomainUroos } from "@/lib/subdomain-config";
 
 /* ---------- Search Schema ---------- */
 
@@ -1212,28 +1213,53 @@ function FeaturedUroosView({
                   </div>
 
                   <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
-                    {u.maqamId ? (
-                      <Link
-                        to="/maqam/$id"
-                        params={{ id: u.maqamId }}
-                        className="text-[11px] text-emerald-600 hover:underline font-medium inline-flex items-center gap-1 line-clamp-1"
-                      >
-                        <Building2 className="h-3 w-3 shrink-0" />
-                        Host Maqam
-                      </Link>
-                    ) : (
+                    {u.maqamId ? (() => {
+                      const mUrl = getMaqamUrl(u.maqamId);
+                      const isSdMaqam = mUrl.startsWith("http");
+                      return isSdMaqam ? (
+                        <a
+                          href={mUrl}
+                          className="text-[11px] text-emerald-600 hover:underline font-medium inline-flex items-center gap-1 line-clamp-1"
+                        >
+                          <Building2 className="h-3 w-3 shrink-0" />
+                          Host Maqam
+                        </a>
+                      ) : (
+                        <Link
+                          to="/maqam/$id"
+                          params={{ id: u.maqamId }}
+                          className="text-[11px] text-emerald-600 hover:underline font-medium inline-flex items-center gap-1 line-clamp-1"
+                        >
+                          <Building2 className="h-3 w-3 shrink-0" />
+                          Host Maqam
+                        </Link>
+                      );
+                    })() : (
                       <span className="text-[11px] text-amber-600 font-medium inline-flex items-center gap-1">
                         <Sparkles className="h-3 w-3 shrink-0" />
                         Independent Venue
                       </span>
                     )}
 
-                    <Button asChild size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm ml-auto">
-                      <Link to="/uroos/$id" params={{ id: u.id }}>
-                        Explore Page
-                        <ArrowRight className="ml-1 h-3 w-3" />
-                      </Link>
-                    </Button>
+                    {(() => {
+                      const uUrl = getUroosUrl(u.id);
+                      const isSdUroos = uUrl.startsWith("http");
+                      return isSdUroos ? (
+                        <Button asChild size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm ml-auto">
+                          <a href={uUrl}>
+                            Explore Page
+                            <ArrowRight className="ml-1 h-3 w-3" />
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button asChild size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm ml-auto">
+                          <Link to="/uroos/$id" params={{ id: u.id }}>
+                            Explore Page
+                            <ArrowRight className="ml-1 h-3 w-3" />
+                          </Link>
+                        </Button>
+                      );
+                    })()}
                   </div>
                 </div>
               </Card>

@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { RequestDialog } from "@/components/site/RequestDialog";
 import { Plus } from "lucide-react";
+import { getMaqamUrl, isSubdomainMaqam } from "@/lib/subdomain-config";
 
 
 
@@ -337,11 +338,17 @@ function MaqamPage() {
                     Popular maqams
                   </div>
                   <div className="grid gap-2 text-left sm:grid-cols-2">
-                    {suggestions.popular.map((m) => (
-                      <Link
+                    {suggestions.popular.map((m) => {
+                      const url = getMaqamUrl(m.id);
+                      const isExternal = url.startsWith("http");
+                      const Wrapper = isExternal ? "a" : Link;
+                      const wrapperProps = isExternal
+                        ? { href: url }
+                        : { to: "/maqam/$id" as const, params: { id: m.id } };
+                      return (
+                      <Wrapper
                         key={m.id}
-                        to="/maqam/$id"
-                        params={{ id: m.id }}
+                        {...(wrapperProps as any)}
                         className="group flex items-start gap-3 rounded-lg border border-border p-3 hover:bg-accent"
                       >
                         <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -353,8 +360,9 @@ function MaqamPage() {
                             {m.city}, {m.country}
                           </div>
                         </div>
-                      </Link>
-                    ))}
+                      </Wrapper>
+                    );
+                    })}
                   </div>
                 </div>
               )}
@@ -453,57 +461,72 @@ function Chip({
 }
 
 function MaqamCard({ maqam: m }: { maqam: Maqam }) {
+  const url = getMaqamUrl(m.id);
+  const isExternal = url.startsWith("http");
+
+  const cardContent = (
+    <Card className="flex h-full flex-col p-6 transition-all hover:-translate-y-0.5 hover:shadow-elegant">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-display text-lg font-semibold leading-snug group-hover:underline">
+            {m.name}
+          </h3>
+          {m.malayalamName && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {m.malayalamName}
+            </p>
+          )}
+        </div>
+        <Badge variant="secondary" className="shrink-0">
+          {CATEGORY_LABELS[m.category]}
+        </Badge>
+      </div>
+
+      <div className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
+        <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+        <span className="break-words">
+          {m.city}, {m.country}
+        </span>
+      </div>
+
+      <p className="mt-3 line-clamp-3 text-sm text-foreground/80">
+        {m.description}
+      </p>
+
+      <div className="mt-auto pt-5">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <Badge variant="outline">{REGION_LABELS[m.region]}</Badge>
+          {m.era && (
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              {m.era}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-4 flex items-center gap-1.5 text-sm font-medium text-primary">
+          <span>Explore</span>
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </div>
+      </div>
+    </Card>
+  );
+
+  if (isExternal) {
+    return (
+      <a href={url} className="group text-left">
+        {cardContent}
+      </a>
+    );
+  }
+
   return (
     <Link
       to="/maqam/$id"
       params={{ id: m.id }}
       className="group text-left"
     >
-      <Card className="flex h-full flex-col p-6 transition-all hover:-translate-y-0.5 hover:shadow-elegant">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="font-display text-lg font-semibold leading-snug group-hover:underline">
-              {m.name}
-            </h3>
-            {m.malayalamName && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                {m.malayalamName}
-              </p>
-            )}
-          </div>
-          <Badge variant="secondary" className="shrink-0">
-            {CATEGORY_LABELS[m.category]}
-          </Badge>
-        </div>
-
-        <div className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
-          <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-          <span className="break-words">
-            {m.city}, {m.country}
-          </span>
-        </div>
-
-        <p className="mt-3 line-clamp-3 text-sm text-foreground/80">
-          {m.description}
-        </p>
-
-        <div className="mt-auto pt-5">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <Badge variant="outline">{REGION_LABELS[m.region]}</Badge>
-            {m.era && (
-              <span className="inline-flex items-center gap-1 text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                {m.era}
-              </span>
-            )}
-          </div>
-
-          <div className="mt-4 flex items-center gap-1.5 text-sm font-medium text-primary">
-            <span>Explore</span>
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </div>
-        </div>
-      </Card>
+      {cardContent}
     </Link>
   );
 }

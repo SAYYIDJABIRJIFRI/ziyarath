@@ -42,6 +42,7 @@ import {
 import { toast } from "sonner";
 import { getUroosPublicDetailFn } from "@/lib/content.functions";
 import type { DbUroos, DbMaqam } from "@/types/content";
+import { getSubdomainForUroos, ROOT_DOMAIN, getMaqamUrl } from "@/lib/subdomain-config";
 
 export const Route = createFileRoute("/uroos_/$id")({
   loader: async ({ params }) => {
@@ -58,6 +59,11 @@ export const Route = createFileRoute("/uroos_/$id")({
     }
     const title = `${u.title} ${u.malayalamTitle ? `(${u.malayalamTitle})` : ""} — Ziyarath`;
     const description = u.description.slice(0, 155);
+    const SITE = "https://ziyarath.com";
+    const subdomain = getSubdomainForUroos(params.id);
+    const canonicalUrl = subdomain
+      ? `https://${subdomain}.${ROOT_DOMAIN}/uroos`
+      : `${SITE}/uroos/${params.id}`;
     return {
       meta: [
         { title },
@@ -66,7 +72,9 @@ export const Route = createFileRoute("/uroos_/$id")({
         { property: "og:description", content: description },
         { property: "og:image", content: u.coverImage || "/assets/og-image.jpg" },
         { property: "og:type", content: "event" },
+        { property: "og:url", content: canonicalUrl },
       ],
+      links: [{ rel: "canonical", href: canonicalUrl }],
     };
   },
   component: UroosDetailPage,
