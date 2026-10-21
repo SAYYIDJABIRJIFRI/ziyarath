@@ -45,6 +45,15 @@ import type { DbUroos, DbMaqam } from "@/types/content";
 import { getSubdomainForUroos, ROOT_DOMAIN, getMaqamUrl } from "@/lib/subdomain-config";
 
 export const Route = createFileRoute("/uroos_/$id")({
+  beforeLoad: ({ params }) => {
+    const subdomain = getSubdomainForUroos(params.id);
+    if (subdomain && typeof window !== "undefined") {
+      const currentHost = window.location.hostname;
+      if (currentHost !== `${subdomain}.${ROOT_DOMAIN}`) {
+        window.location.href = `https://${subdomain}.${ROOT_DOMAIN}/uroos`;
+      }
+    }
+  },
   loader: async ({ params }) => {
     const { uroos, connectedMaqam } = await getUroosPublicDetailFn({ data: { id: params.id } });
     if (!uroos) {

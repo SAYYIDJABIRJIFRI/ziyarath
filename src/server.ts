@@ -67,49 +67,78 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 }
 
 /**
- * Subdomain URL rewriting.
- * When a registered subdomain is detected (e.g. mampuram.ziyarath.com):
- *   /maqam  → /maqam/mampuram  (the maqam detail page)
- *   /uroos  → /uroos/mampuram-uroos  (the uroos detail page)
- *   /       → 302 redirect to /maqam on the same subdomain
+ * Subdomain URL rewriting & 301 redirection.
  *
- * All other paths (assets, API calls, etc.) pass through unchanged.
+ * 1. Root domain (ziyarath.com):
+ *    - /maqam/mampuram      → 301 redirect to https://mampuram.ziyarath.com/maqam
+ *    - /uroos/mampuram-uroos → 301 redirect to https://mampuram.ziyarath.com/uroos
+ *
+ * 2. Registered subdomain (e.g. mampuram.ziyarath.com):
+ *    - /                    → 302 redirect to /maqam on the subdomain
+ *    - /maqam/mampuram      → 301 normalize to /maqam
+ *    - /uroos/mampuram-uroos → 301 normalize to /uroos
+ *    - /maqam               → rewrites internally to /maqam/mampuram for SSR
+ *    - /uroos               → rewrites internally to /uroos/mampuram-uroos for SSR
  */
 function rewriteForSubdomain(request: Request): Request | Response | null {
   const url = new URL(request.url);
   const host = url.hostname;
-
-  // Quick exit for non-subdomain requests
+  const pathname = url.pathname;
   const ROOT_DOMAIN = "ziyarath.com";
+
+  // Registry matching src/lib/subdomain-config.ts
+  const SUBDOMAIN_REGISTRY: Record<string, { maqamId: string; uroosId: string | null }> = {
+    mampuram: { maqamId: "mampuram", uroosId: "mampuram-uroos" },
+  };
+
+  // Case 1: Main domain or www (e.g. ziyarath.com)
+  // 301 permanent redirect legacy paths to their dedicated subdomain
+  if (host === ROOT_DOMAIN || host === `www.${ROOT_DOMAIN}`) {
+    for (const [sub, entry] of Object.entries(SUBDOMAIN_REGISTRY)) {
+      if (pathname === `/maqam/${entry.maqamId}` || pathname === `/maqam/${entry.maqamId}/`) {
+        return Response.redirect(`https://${sub}.${ROOT_DOMAIN}/maqam`, 301);
+      }
+      if (entry.uroosId && (pathname === `/uroos/${entry.uroosId}` || pathname === `/uroos/${entry.uroosId}/`)) {
+        return Response.redirect(`https://${sub}.${ROOT_DOMAIN}/uroos`, 301);
+      }
+    }
+    return null;
+  }
+
+  // Case 2: Not on root domain — verify if subdomain
   if (!host.endsWith(`.${ROOT_DOMAIN}`)) return null;
 
   const prefix = host.slice(0, -(ROOT_DOMAIN.length + 1));
   if (!prefix || prefix === "www") return null;
 
-  // Inline registry lookup (avoids importing ESM in the worker entrypoint scope)
-  const SUBDOMAIN_REGISTRY: Record<string, { maqamId: string; uroosId: string | null }> = {
-    mampuram: { maqamId: "mampuram", uroosId: "mampuram-uroos" },
-    // Add more here to match src/lib/subdomain-config.ts
-  };
-
   const entry = SUBDOMAIN_REGISTRY[prefix];
   if (!entry) return null;
 
-  const pathname = url.pathname;
-
-  // Redirect root to /maqam on the subdomain
+  // Root on subdomain: redirect to /maqam
   if (pathname === "/" || pathname === "") {
     url.pathname = "/maqam";
     return Response.redirect(url.toString(), 302);
   }
 
-  // Rewrite /maqam → /maqam/{maqamId}
+  // If user visits /maqam/{id} on the subdomain, normalize to /maqam
+  if (pathname === `/maqam/${entry.maqamId}` || pathname === `/maqam/${entry.maqamId}/`) {
+    url.pathname = "/maqam";
+    return Response.redirect(url.toString(), 301);
+  }
+
+  // If user visits /uroos/{id} on the subdomain, normalize to /uroos
+  if (entry.uroosId && (pathname === `/uroos/${entry.uroosId}` || pathname === `/uroos/${entry.uroosId}/`)) {
+    url.pathname = "/uroos";
+    return Response.redirect(url.toString(), 301);
+  }
+
+  // Rewrite /maqam → /maqam/{maqamId} for internal TanStack SSR handling
   if (pathname === "/maqam" || pathname === "/maqam/") {
     url.pathname = `/maqam/${entry.maqamId}`;
     return new Request(url.toString(), request);
   }
 
-  // Rewrite /uroos → /uroos/{uroosId}
+  // Rewrite /uroos → /uroos/{uroosId} for internal TanStack SSR handling
   if ((pathname === "/uroos" || pathname === "/uroos/") && entry.uroosId) {
     url.pathname = `/uroos/${entry.uroosId}`;
     return new Request(url.toString(), request);
