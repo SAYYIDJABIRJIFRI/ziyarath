@@ -469,20 +469,20 @@ function MaqamDetailPage() {
                           </p>
                         </div>
                         <Button asChild className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
-                        {(() => {\r
-                          const uUrl = getUroosUrl(u.id);\r
-                          const isSdUroos = uUrl.startsWith("http");\r
-                          return isSdUroos ? (\r
-                            <a href={uUrl}>\r
-                              View Uroos Page\r
-                              <ExternalLink className="ml-1.5 h-3.5 w-3.5" />\r
-                            </a>\r
-                          ) : (\r
-                            <Link to="/uroos/$id" params={{ id: u.id }}>\r
-                              View Uroos Page\r
-                              <ExternalLink className="ml-1.5 h-3.5 w-3.5" />\r
-                            </Link>\r
-                          );\r
+                        {(() => {
+                          const uUrl = getUroosUrl(u.id);
+                          const isSdUroos = uUrl.startsWith("http");
+                          return isSdUroos ? (
+                            <a href={uUrl}>
+                              View Uroos Page
+                              <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                            </a>
+                          ) : (
+                            <Link to="/uroos/$id" params={{ id: u.id }}>
+                              View Uroos Page
+                              <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                            </Link>
+                          );
                         })()}
                         </Button>
                       </div>
