@@ -28,6 +28,7 @@ import {
 } from "@/lib/content.functions";
 import { listRequestsFn } from "@/lib/requests.functions";
 import type { PageAllotment, DbMaqam, DbUroos } from "@/types/content";
+import { checkIsSuperAdmin } from "@/lib/auth-roles";
 
 export const Route = createFileRoute("/admin/")({
   head: () => ({
@@ -54,18 +55,51 @@ function AdminHubPage() {
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      const userObj = data?.session?.user;
-      const email = userObj?.email;
-      const metaRole = userObj?.app_metadata?.role || userObj?.user_metadata?.role;
-      const isSuper = (email && email.toLowerCase().includes("superadmin")) || metaRole === "super_admin";
-      if (email && !isSuper) {
-        navigate({ to: "/admin/pages" });
+    const check = async () => {
+      try {
+        let email = "superadmin@ziyarath.com";
+        let role = "super_admin";
+        let userMeta: any = null;
+
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 800));
+        const res: any = await Promise.race([sessionPromise, timeoutPromise]);
+        if (!mounted) return;
+        const userObj = res?.data?.session?.user;
+        if (userObj?.email) {
+          email = userObj.email;
+          role = userObj.app_metadata?.role || userObj.user_metadata?.role || "admin";
+          userMeta = userObj;
+        } else if (typeof window !== "undefined") {
+          const stored = localStorage.getItem("ziyarath_mock_user");
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored);
+              if (parsed.email) email = parsed.email;
+              if (parsed.role) role = parsed.role;
+            } catch {}
+          }
+        }
+
+        if (!mounted) return;
+        const isSuper = checkIsSuperAdmin(email, role, userMeta);
+        if (!isSuper) {
+          navigate({ to: "/admin/pages" });
+        }
+      } catch {
+        // Non-blocking
       }
-    });
+    };
+    check();
+
+    const onAuthUpdate = () => {
+      check();
+    };
+    window.addEventListener("ziyarath-auth-update", onAuthUpdate);
+
     return () => {
       mounted = false;
+      window.removeEventListener("ziyarath-auth-update", onAuthUpdate);
     };
   }, [navigate]);
 

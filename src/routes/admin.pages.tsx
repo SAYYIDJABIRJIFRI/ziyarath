@@ -59,6 +59,7 @@ import {
   listAllotmentsFn,
 } from "@/lib/content.functions";
 import type { DbMaqam, DbUroos, PageAllotment } from "@/types/content";
+import { checkIsSuperAdmin } from "@/lib/auth-roles";
 
 // Bundled high-resolution assets for quick presets
 import coverMampuram from "@/assets/maqam-mampuram.jpg";
@@ -177,6 +178,7 @@ function AdminPagesManagement() {
   };
 
   const [authenticatedEmail, setAuthenticatedEmail] = useState<string | null>(null);
+  const [actualUserRole, setActualUserRole] = useState<"super_admin" | "admin">("super_admin");
 
   // Automatically detect logged-in Supabase session on mount
   useEffect(() => {
@@ -192,26 +194,55 @@ function AdminPagesManagement() {
         if (email) {
           setAuthenticatedEmail(email);
           const metaRole = userObj?.app_metadata?.role || userObj?.user_metadata?.role;
-          const isSuper = email.toLowerCase().includes("superadmin") || metaRole === "super_admin";
+          const isSuper = checkIsSuperAdmin(email, metaRole);
           const role = isSuper ? "super_admin" : "admin";
           const uid = userObj?.id || `usr-${email.toLowerCase().replace(/[^a-z0-9]/gi, "")}`;
+          setActualUserRole(role);
           setCurrentUserEmail(email);
           setCurrentUserId(uid);
           setCurrentRole(role);
+        } else if (typeof window !== "undefined") {
+          // Check if mock user is stored in localStorage
+          try {
+            const stored = localStorage.getItem("ziyarath_mock_user");
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (parsed.email) setCurrentUserEmail(parsed.email);
+              if (parsed.id) setCurrentUserId(parsed.id);
+              if (parsed.role) setCurrentRole(parsed.role === "admin" ? "admin" : "super_admin");
+            }
+          } catch {}
         }
       } catch {
         // Non-blocking
       }
     };
     detectSession();
+
+    const handleAuthUpdate = () => {
+      if (!mounted) return;
+      try {
+        const stored = localStorage.getItem("ziyarath_mock_user");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.email) setCurrentUserEmail(parsed.email);
+          if (parsed.id) setCurrentUserId(parsed.id);
+          if (parsed.role) setCurrentRole(parsed.role === "admin" ? "admin" : "super_admin");
+        }
+      } catch {}
+    };
+    window.addEventListener("ziyarath-auth-update", handleAuthUpdate);
+
     return () => {
       mounted = false;
+      window.removeEventListener("ziyarath-auth-update", handleAuthUpdate);
     };
   }, []);
 
-  const isRealSuperAdmin = authenticatedEmail
-    ? authenticatedEmail.toLowerCase().includes("superadmin") || currentRole === "super_admin"
-    : currentUserEmail.toLowerCase().includes("superadmin") || currentRole === "super_admin";
+  const isRealSuperAdmin =
+    actualUserRole === "super_admin" ||
+    checkIsSuperAdmin(authenticatedEmail) ||
+    (!authenticatedEmail && currentRole === "super_admin");
 
   useEffect(() => {
     loadData(currentRole, currentUserEmail, currentUserId);
@@ -224,12 +255,14 @@ function AdminPagesManagement() {
     }
     let mockData = null;
     if (persona === "super_admin") {
+      const superEmail = authenticatedEmail && checkIsSuperAdmin(authenticatedEmail) ? authenticatedEmail : "superadmin@ziyarath.com";
+      const superId = authenticatedEmail && checkIsSuperAdmin(authenticatedEmail) ? `usr-${authenticatedEmail.toLowerCase().replace(/[^a-z0-9]/gi, "")}` : "superadmin-001";
       setCurrentRole("super_admin");
-      setCurrentUserEmail("superadmin@ziyarath.com");
-      setCurrentUserId("superadmin-001");
+      setCurrentUserEmail(superEmail);
+      setCurrentUserId(superId);
       mockData = {
-        email: "superadmin@ziyarath.com",
-        id: "superadmin-001",
+        email: superEmail,
+        id: superId,
         role: "super_admin",
         name: "Super Administrator",
       };
@@ -560,7 +593,7 @@ function AdminPagesManagement() {
                   <button
                     onClick={() => handleRoleSwitch("super_admin")}
                     className={`px-2.5 py-1 rounded-md transition-all ${
-                      currentUserEmail === "superadmin@ziyarath.com"
+                      currentRole === "super_admin"
                         ? "bg-primary text-primary-foreground font-semibold shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
@@ -571,7 +604,7 @@ function AdminPagesManagement() {
                   <button
                     onClick={() => handleRoleSwitch("allotted_admin")}
                     className={`px-2.5 py-1 rounded-md transition-all ${
-                      currentUserEmail === "admin@ziyarath.com"
+                      currentRole === "admin" && currentUserEmail !== "newadmin@ziyarath.com" && totalPagesCount > 0
                         ? "bg-primary text-primary-foreground font-semibold shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
@@ -582,7 +615,7 @@ function AdminPagesManagement() {
                   <button
                     onClick={() => handleRoleSwitch("unallotted_admin")}
                     className={`px-2.5 py-1 rounded-md transition-all ${
-                      currentUserEmail === "newadmin@ziyarath.com"
+                      currentRole === "admin" && (currentUserEmail === "newadmin@ziyarath.com" || totalPagesCount === 0)
                         ? "bg-primary text-primary-foreground font-semibold shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}

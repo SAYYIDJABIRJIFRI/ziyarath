@@ -14,6 +14,7 @@ import {
   listMaqamsPublicFn,
 } from "@/lib/content.functions";
 import type { DbMaqam } from "@/types/content";
+import { checkIsSuperAdmin } from "@/lib/auth-roles";
 import { DbHealthPanel } from "@/components/admin/DbHealthPanel";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
@@ -106,9 +107,65 @@ function AdminRequestsPage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const [isAdmin, setIsAdmin] = useState(true);
   const [currentUserEmail, setCurrentUserEmail] = useState("superadmin@ziyarath.com");
+  const [isSuperAdmin, setIsSuperAdmin] = useState(true);
   const [claiming, setClaiming] = useState(false);
   const [rows, setRows] = useState<RequestRow[] | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Session detection & Super Admin restriction
+  useEffect(() => {
+    let mounted = true;
+    const check = async () => {
+      try {
+        let email = "superadmin@ziyarath.com";
+        let role = "super_admin";
+        let userMeta: any = null;
+
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 800));
+        const res: any = await Promise.race([sessionPromise, timeoutPromise]);
+        if (!mounted) return;
+        const userObj = res?.data?.session?.user;
+        if (userObj?.email) {
+          email = userObj.email;
+          role = userObj.app_metadata?.role || userObj.user_metadata?.role || "admin";
+          userMeta = userObj;
+        } else if (typeof window !== "undefined") {
+          const stored = localStorage.getItem("ziyarath_mock_user");
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored);
+              if (parsed.email) email = parsed.email;
+              if (parsed.role) role = parsed.role;
+            } catch {}
+          }
+        }
+
+        if (!mounted) return;
+        setCurrentUserEmail(email);
+        const isSuper = checkIsSuperAdmin(email, role, userMeta);
+        setIsSuperAdmin(isSuper);
+        setIsAdmin(isSuper);
+        if (!isSuper) {
+          toast.error("Requests management is only for Super Admins. Redirected to /admin/pages.");
+          navigate({ to: "/admin/pages" });
+        }
+      } catch {
+        // Non-blocking
+      }
+    };
+    check();
+
+    const onAuthUpdate = () => {
+      check();
+    };
+    window.addEventListener("ziyarath-auth-update", onAuthUpdate);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener("ziyarath-auth-update", onAuthUpdate);
+    };
+  }, [navigate]);
   const [status, setStatus] = useState<Status>("pending");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [sort, setSort] = useState<SortKey>("newest");
@@ -170,8 +227,8 @@ function AdminRequestsPage() {
         data: {
           requestId: createModalRow.id,
           type: createModalRow.type,
-          reviewerId: "superadmin-system",
-          reviewerEmail: "superadmin@ziyarath.com",
+          reviewerId: `usr-${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/gi, "")}`,
+          reviewerEmail: currentUserEmail,
           reviewNotes: createForm.reviewNotes,
           allotToUserEmail: createForm.allotToUserEmail,
           data: {
@@ -501,8 +558,6 @@ function AdminRequestsPage() {
   const allVisibleChecked =
     filtered.length > 0 && filtered.every((r) => checkedIds.has(r.id));
   const someChecked = checkedIds.size > 0;
-
-  const isSuperAdmin = currentUserEmail.toLowerCase().includes("superadmin");
 
   if (!isSuperAdmin) {
     return (

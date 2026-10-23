@@ -9,6 +9,7 @@ import type { DbMaqam, DbUroos, PageAllotment, SystemUser } from "@/types/conten
 export type { DbMaqam, DbUroos, PageAllotment, SystemUser };
 export { insertAudit } from "./requests-db.server";
 import { ALL_DEDICATED_UROOS } from "@/data/uroos-pages";
+import { checkIsSuperAdmin } from "./auth-roles";
 
 // -------------------------------------------------------------
 // Seed In-Memory Store
@@ -76,6 +77,14 @@ const seedUsers: SystemUser[] = [
     userEmail: "newadmin@ziyarath.com",
     role: "admin",
     displayName: "New Page Admin (Unallotted)",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  },
+  {
+    id: "usr-004",
+    userId: "sayyidjabirjifri",
+    userEmail: "sayyidjabirjifri@gmail.com",
+    role: "super_admin",
+    displayName: "Sayyid Jabir Jifri",
     createdAt: "2026-01-01T00:00:00.000Z",
   }
 ];
@@ -729,8 +738,8 @@ export async function listSystemUsers(): Promise<SystemUser[]> {
 }
 
 export async function getUserRole(userId: string, email?: string | null): Promise<"super_admin" | "admin" | "user"> {
-  // If email matches super admin
-  if (email && email.toLowerCase().includes("superadmin")) {
+  // Check if matches Super Admin email or rule
+  if (checkIsSuperAdmin(email)) {
     return "super_admin";
   }
   const users = await listSystemUsers();

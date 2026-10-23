@@ -49,6 +49,7 @@ import {
 } from "@/lib/content.functions";
 import { useServerFn } from "@tanstack/react-start";
 import type { PageAllotment, SystemUser, DbMaqam, DbUroos } from "@/types/content";
+import { checkIsSuperAdmin } from "@/lib/auth-roles";
 
 export const Route = createFileRoute("/admin/allotments")({
   head: () => ({
@@ -108,34 +109,59 @@ function AdminAllotmentsPage() {
   };
 
   const [currentUserEmail, setCurrentUserEmail] = useState("superadmin@ziyarath.com");
+  const [isSuperAdmin, setIsSuperAdmin] = useState(true);
 
   // Session detection & Super Admin restriction
   useEffect(() => {
     let mounted = true;
     const check = async () => {
       try {
+        let email = "superadmin@ziyarath.com";
+        let role = "super_admin";
+        let userMeta: any = null;
+
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 800));
         const res: any = await Promise.race([sessionPromise, timeoutPromise]);
         if (!mounted) return;
         const userObj = res?.data?.session?.user;
-        const email = userObj?.email;
-        if (email) {
-          setCurrentUserEmail(email);
-          const metaRole = userObj?.app_metadata?.role || userObj?.user_metadata?.role;
-          const isSuper = email.toLowerCase().includes("superadmin") || metaRole === "super_admin";
-          if (!isSuper) {
-            toast.error("Allotments management is only for Super Admins. Redirected to /admin/pages.");
-            navigate({ to: "/admin/pages" });
+        if (userObj?.email) {
+          email = userObj.email;
+          role = userObj.app_metadata?.role || userObj.user_metadata?.role || "admin";
+          userMeta = userObj;
+        } else if (typeof window !== "undefined") {
+          const stored = localStorage.getItem("ziyarath_mock_user");
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored);
+              if (parsed.email) email = parsed.email;
+              if (parsed.role) role = parsed.role;
+            } catch {}
           }
+        }
+
+        if (!mounted) return;
+        setCurrentUserEmail(email);
+        const isSuper = checkIsSuperAdmin(email, role, userMeta);
+        setIsSuperAdmin(isSuper);
+        if (!isSuper) {
+          toast.error("Allotments management is only for Super Admins. Redirected to /admin/pages.");
+          navigate({ to: "/admin/pages" });
         }
       } catch {
         // Non-blocking
       }
     };
     check();
+
+    const onAuthUpdate = () => {
+      check();
+    };
+    window.addEventListener("ziyarath-auth-update", onAuthUpdate);
+
     return () => {
       mounted = false;
+      window.removeEventListener("ziyarath-auth-update", onAuthUpdate);
     };
   }, [navigate]);
 
@@ -214,8 +240,6 @@ function AdminAllotmentsPage() {
       toast.error(err instanceof Error ? err.message : "Failed to revoke");
     }
   };
-
-  const isSuperAdmin = currentUserEmail.toLowerCase().includes("superadmin");
 
   if (!isSuperAdmin) {
     return (

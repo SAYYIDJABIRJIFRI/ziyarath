@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { checkIsSuperAdmin } from "./auth-roles";
 
 // Public: Get all published Maqams
 export const listMaqamsPublicFn = createServerFn({ method: "GET" }).handler(async () => {
@@ -172,7 +173,7 @@ export const createAllotmentFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { createAllotment, getUserRole } = await import("./content-db.server");
     const role = data.assignedByRole || (await getUserRole(data.assignedBy, data.assignedByEmail));
-    const isSuper = role === "super_admin" || (data.assignedByEmail && data.assignedByEmail.toLowerCase().includes("superadmin"));
+    const isSuper = checkIsSuperAdmin(data.assignedByEmail, role);
     if (!isSuper) {
       throw new Error("Permission Denied: Only Super Admins can allot pages to Page Admins.");
     }
@@ -201,7 +202,7 @@ export const revokeAllotmentFn = createServerFn({ method: "POST" })
     const { revokeAllotment, getUserRole } = await import("./content-db.server");
     if (data.requesterId || data.requesterEmail) {
       const role = data.requesterRole || (await getUserRole(data.requesterId || "", data.requesterEmail));
-      const isSuper = role === "super_admin" || (data.requesterEmail && data.requesterEmail.toLowerCase().includes("superadmin"));
+      const isSuper = checkIsSuperAdmin(data.requesterEmail, role);
       if (!isSuper) {
         throw new Error("Permission Denied: Only Super Admins can revoke page allotments.");
       }
@@ -228,12 +229,13 @@ export const getMyManagedPagesFn = createServerFn({ method: "GET" })
         .parse(input)
   )
   .handler(async ({ data }) => {
-    const { listMaqams, listUroos, getUserAllotments } = await import("./content-db.server");
+    const { listMaqams, listUroos, getUserAllotments, getUserRole } = await import("./content-db.server");
     const allMaqams = await listMaqams(true);
     const allUroos = await listUroos(true);
 
     // If user is super_admin, return all pages
-    const isSuper = data.role === "super_admin" || (data.userEmail && data.userEmail.toLowerCase().includes("superadmin"));
+    const effectiveRole = data.role || (await getUserRole(data.userId, data.userEmail));
+    const isSuper = checkIsSuperAdmin(data.userEmail, effectiveRole);
     if (isSuper) {
       return {
         isSuperAdmin: true,
@@ -284,7 +286,7 @@ export const updatePageContentFn = createServerFn({ method: "POST" })
     if (!role) {
       role = await getUserRole(data.editorId, data.editorEmail);
     }
-    const isSuper = role === "super_admin" || (data.editorEmail && data.editorEmail.toLowerCase().includes("superadmin"));
+    const isSuper = checkIsSuperAdmin(data.editorEmail, role);
 
     // Page Admin verification: Must be allotted to this user
     if (!isSuper) {
