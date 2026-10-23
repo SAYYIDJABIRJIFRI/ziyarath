@@ -207,7 +207,11 @@ export const revokeAllotmentFn = createServerFn({ method: "POST" })
         throw new Error("Permission Denied: Only Super Admins can revoke page allotments.");
       }
     }
-    return revokeAllotment(data.id);
+    return revokeAllotment(data.id, {
+      id: data.requesterId,
+      email: data.requesterEmail,
+      role: data.requesterRole,
+    });
   });
 
 // Super Admin: List system admins for allotment picker

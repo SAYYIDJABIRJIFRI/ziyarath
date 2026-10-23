@@ -625,6 +625,7 @@ export async function listAllotments(): Promise<PageAllotment[]> {
   const db = getDB();
   if (db) {
     try {
+      await ensureContentSchema(db);
       const { results } = await db
         .prepare("SELECT * FROM page_allotments ORDER BY created_at DESC")
         .all<Record<string, unknown>>();
@@ -654,8 +655,8 @@ export async function listAllotments(): Promise<PageAllotment[]> {
         }
         return Array.from(map.values());
       }
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.warn("[D1 Content] listAllotments error:", err);
     }
   }
   return [...memoryAllotments];
@@ -690,6 +691,7 @@ export async function createAllotment(input: {
   const db = getDB();
   if (db) {
     try {
+      await ensureContentSchema(db);
       await db
         .prepare(
           `INSERT INTO page_allotments
@@ -715,9 +717,24 @@ export async function createAllotment(input: {
           allotment.updatedAt
         )
         .run();
-    } catch {
-      // In-memory
+    } catch (err) {
+      console.warn("[D1 Content] createAllotment error:", err);
     }
+  }
+
+  // Record audit log for allotment creation
+  try {
+    await insertAudit({
+      action: "allot",
+      request_id: allotment.id,
+      request_type: allotment.targetType,
+      request_subject: allotment.targetTitle,
+      actor_id: allotment.assignedBy,
+      actor_email: allotment.assignedByEmail || null,
+      notes: `Allotted ${allotment.targetType} "${allotment.targetTitle}" (${allotment.targetId}) to ${allotment.userEmail}. Notes: ${allotment.notes || "None"}`,
+    });
+  } catch (err) {
+    console.warn("[D1 Content] insertAudit for createAllotment note:", err);
   }
 
   // Remove duplicate if exists in memory by email + type + target
@@ -733,18 +750,42 @@ export async function createAllotment(input: {
   return allotment;
 }
 
-export async function revokeAllotment(id: string): Promise<boolean> {
+export async function revokeAllotment(
+  id: string,
+  requester?: { id?: string; email?: string | null; role?: string }
+): Promise<boolean> {
+  const allAllots = await listAllotments();
+  const existing = allAllots.find((a) => a.id === id);
+
   const db = getDB();
   if (db) {
     try {
+      await ensureContentSchema(db);
       await db.prepare("DELETE FROM page_allotments WHERE id = ?").bind(id).run();
-    } catch {
-      // Ignore
+    } catch (err) {
+      console.warn("[D1 Content] revokeAllotment error:", err);
     }
   }
   const prevLen = memoryAllotments.length;
   memoryAllotments = memoryAllotments.filter((a) => a.id !== id);
-  return memoryAllotments.length < prevLen;
+
+  if (existing) {
+    try {
+      await insertAudit({
+        action: "revoke",
+        request_id: existing.id,
+        request_type: existing.targetType,
+        request_subject: existing.targetTitle,
+        actor_id: requester?.id || "super_admin",
+        actor_email: requester?.email || null,
+        notes: `Revoked allotment of ${existing.targetType} "${existing.targetTitle}" (${existing.targetId}) from ${existing.userEmail}`,
+      });
+    } catch (err) {
+      console.warn("[D1 Content] insertAudit for revokeAllotment note:", err);
+    }
+  }
+
+  return true;
 }
 
 export async function getUserAllotments(userId: string, userEmail?: string | null): Promise<PageAllotment[]> {
@@ -763,6 +804,7 @@ export async function listSystemUsers(): Promise<SystemUser[]> {
   let baseUsers: SystemUser[] = [...memoryUsers];
   if (db) {
     try {
+      await ensureContentSchema(db);
       const { results } = await db.prepare("SELECT * FROM system_roles").all<Record<string, unknown>>();
       if (results && results.length > 0) {
         const d1Users: SystemUser[] = results.map((r) => ({

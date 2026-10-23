@@ -212,8 +212,9 @@ function AdminAllotmentsPage() {
           targetType,
           targetId: selectedTargetId,
           targetTitle,
-          assignedBy: "superadmin-system",
+          assignedBy: currentUserEmail,
           assignedByEmail: currentUserEmail,
+          assignedByRole: "super_admin",
           notes: notes.trim() || undefined,
         },
       });
@@ -233,7 +234,14 @@ function AdminAllotmentsPage() {
   const handleRevoke = async (a: PageAllotment) => {
     if (!confirm(`Revoke allotment of "${a.targetTitle}" from ${a.userEmail}?`)) return;
     try {
-      await revokeAllotFn({ data: { id: a.id } });
+      await revokeAllotFn({
+        data: {
+          id: a.id,
+          requesterId: currentUserEmail,
+          requesterEmail: currentUserEmail,
+          requesterRole: "super_admin",
+        },
+      });
       toast.success("Allotment revoked");
       loadData();
     } catch (err) {

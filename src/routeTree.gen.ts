@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as AllotmentsRouteImport } from './routes/allotments'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as MaqamRouteImport } from './routes/maqam'
@@ -38,6 +39,11 @@ const IndexRoute = IndexRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AllotmentsRoute = AllotmentsRouteImport.update({
+  id: '/allotments',
+  path: '/allotments',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -134,6 +140,7 @@ const ApiPublicSeoCheckRoute = ApiPublicSeoCheckRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/allotments': typeof AllotmentsRoute
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/maqam': typeof MaqamRoute
@@ -156,6 +163,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/allotments': typeof AllotmentsRoute
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/maqam': typeof MaqamRoute
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/allotments': typeof AllotmentsRoute
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/maqam': typeof MaqamRoute
@@ -203,6 +212,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/allotments'
     | '/auth'
     | '/contact'
     | '/maqam'
@@ -225,6 +235,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/allotments'
     | '/auth'
     | '/contact'
     | '/maqam'
@@ -247,6 +258,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
+    | '/allotments'
     | '/auth'
     | '/contact'
     | '/maqam'
@@ -270,6 +282,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  AllotmentsRoute: typeof AllotmentsRoute
   AuthRoute: typeof AuthRoute
   ContactRoute: typeof ContactRoute
   MaqamRoute: typeof MaqamRoute
@@ -304,6 +317,13 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/allotments': {
+      id: '/allotments'
+      path: '/allotments'
+      fullPath: '/allotments'
+      preLoaderRoute: typeof AllotmentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -438,6 +458,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  AllotmentsRoute: AllotmentsRoute,
   AuthRoute: AuthRoute,
   ContactRoute: ContactRoute,
   MaqamRoute: MaqamRoute,
