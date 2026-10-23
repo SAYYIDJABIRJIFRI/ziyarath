@@ -976,3 +976,109 @@ export async function approveRequestAndCreate(
 
   return { success: true, createdId, type };
 }
+
+// -------------------------------------------------------------
+// Managed Pages & Page Edit Authorization
+// -------------------------------------------------------------
+
+export async function handleGetMyManagedPages(data: {
+  userId: string;
+  userEmail?: string;
+  role?: "super_admin" | "admin" | "user";
+}) {
+  const allMaqams = await listMaqams(true);
+  const allUroos = await listUroos(true);
+
+  // Verify user's actual role from server database & identity
+  const dbRole = await getUserRole(data.userId, data.userEmail);
+  const hasSuperAuthority = checkIsSuperAdmin(data.userEmail, dbRole);
+  
+  // If client requested 'admin' persona simulation, or if user is NOT a genuine super admin:
+  // strictly enforce page admin allotment restrictions
+  const simulateAdmin = data.role === "admin";
+  const isSuper = hasSuperAuthority && !simulateAdmin;
+
+  if (isSuper) {
+    return {
+      isSuperAdmin: true,
+      allottedMaqams: allMaqams,
+      allottedUroos: allUroos,
+    };
+  }
+
+  // Otherwise Page Admin: filter strictly by user allotments with normalized IDs
+  const allotments = await getUserAllotments(data.userId, data.userEmail);
+  const maqamIds = new Set(
+    allotments
+      .filter((a) => a.targetType.toLowerCase().trim() === "maqam")
+      .map((a) => a.targetId.toLowerCase().trim())
+  );
+  const uroosIds = new Set(
+    allotments
+      .filter((a) => a.targetType.toLowerCase().trim() === "uroos")
+      .map((a) => a.targetId.toLowerCase().trim())
+  );
+
+  return {
+    isSuperAdmin: false,
+    allottedMaqams: allMaqams.filter((m) => maqamIds.has(m.id.toLowerCase().trim())),
+    allottedUroos: allUroos.filter((u) => uroosIds.has(u.id.toLowerCase().trim())),
+  };
+}
+
+export async function handleUpdatePageContent(data: {
+  type: "maqam" | "uroos";
+  id: string;
+  editorId: string;
+  editorEmail?: string;
+  editorRole?: "super_admin" | "admin" | "user";
+  data: Record<string, unknown>;
+}) {
+  // Verify user's actual role from server database & identity
+  const dbRole = await getUserRole(data.editorId, data.editorEmail);
+  const hasSuperAuthority = checkIsSuperAdmin(data.editorEmail, dbRole);
+  const simulateAdmin = data.editorRole === "admin";
+  const isSuper = hasSuperAuthority && !simulateAdmin;
+
+  const targetIdNorm = data.id.toLowerCase().trim();
+  const targetTypeNorm = data.type.toLowerCase().trim();
+
+  // Page Admin verification: MUST be allotted to this user
+  if (!isSuper) {
+    const allotments = await getUserAllotments(data.editorId, data.editorEmail);
+    const isAllotted = allotments.some(
+      (a) =>
+        a.targetType.toLowerCase().trim() === targetTypeNorm &&
+        a.targetId.toLowerCase().trim() === targetIdNorm
+    );
+
+    if (!isAllotted) {
+      throw new Error(
+        `Permission Denied: Page Admins can only edit pages allotted to them. "${data.id}" is not allotted to ${data.editorEmail || data.editorId}.`
+      );
+    }
+  }
+
+  let result: unknown = null;
+  if (data.type === "maqam") {
+    result = await updateMaqam(data.id, data.data as any);
+  } else {
+    result = await updateUroos(data.id, data.data as any);
+  }
+
+  if (!result) {
+    throw new Error(`Failed to update ${data.type} "${data.id}": Page not found.`);
+  }
+
+  await insertAudit({
+    action: "approve",
+    request_id: `edit-${data.id}`,
+    request_type: data.type,
+    request_subject: `Updated ${data.type} ${data.id}`,
+    actor_id: data.editorId,
+    actor_email: data.editorEmail || null,
+    notes: `Updated page content for ${data.id} by ${isSuper ? "Super Admin" : "Allotted Page Admin"}`,
+  });
+
+  return { success: true };
+}
