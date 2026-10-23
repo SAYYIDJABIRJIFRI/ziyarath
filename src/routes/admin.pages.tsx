@@ -338,6 +338,20 @@ function AdminPagesManagement() {
   };
 
   const openEditor = (type: "maqam" | "uroos", item: DbMaqam | DbUroos) => {
+    // Client-side guard: if not in super admin mode, ensure page is allotted
+    if (!isSuperAdmin) {
+      const targetIdNorm = item.id.toLowerCase().trim();
+      const isAllotted = allotments.some(
+        (a) =>
+          a.targetType.toLowerCase().trim() === type &&
+          a.targetId.toLowerCase().trim() === targetIdNorm &&
+          (a.userEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim() || a.userId === currentUserId)
+      );
+      if (!isAllotted) {
+        toast.error(`Permission Denied: You are not authorized to edit this ${type}. Only allotted pages can be edited.`);
+        return;
+      }
+    }
     setEditItem({ type, item });
     setActiveTab("general");
     if (type === "maqam") {
@@ -454,6 +468,20 @@ function AdminPagesManagement() {
     e.preventDefault();
     if (!editItem) return;
 
+    if (!isSuperAdmin) {
+      const targetIdNorm = editItem.item.id.toLowerCase().trim();
+      const isAllotted = allotments.some(
+        (a) =>
+          a.targetType.toLowerCase().trim() === editItem.type &&
+          a.targetId.toLowerCase().trim() === targetIdNorm &&
+          (a.userEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim() || a.userId === currentUserId)
+      );
+      if (!isAllotted) {
+        toast.error(`Permission Denied: Page Admins can only edit pages allotted to them. You are not authorized to edit ${editItem.type} "${editItem.item.id}".`);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const payloadData: Record<string, any> = { ...editForm };
@@ -559,8 +587,23 @@ function AdminPagesManagement() {
 
   // Find allotment info for an item
   const getAllotmentFor = (type: "maqam" | "uroos", id: string) => {
-    return allotments.find((a) => a.targetType === type && a.targetId === id);
+    const norm = id.toLowerCase().trim();
+    return allotments.find((a) => a.targetType.toLowerCase().trim() === type && a.targetId.toLowerCase().trim() === norm);
   };
+
+  // Whether current user is authorized to save edits for the active edit item
+  const canSaveCurrentItem = useMemo(() => {
+    if (!editItem) return false;
+    if (isSuperAdmin) return true;
+    const targetIdNorm = editItem.item.id.toLowerCase().trim();
+    const targetTypeNorm = editItem.type.toLowerCase().trim();
+    return allotments.some(
+      (a) =>
+        a.targetType.toLowerCase().trim() === targetTypeNorm &&
+        a.targetId.toLowerCase().trim() === targetIdNorm &&
+        (a.userEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim() || a.userId === currentUserId)
+    );
+  }, [editItem, isSuperAdmin, allotments, currentUserEmail, currentUserId]);
 
   const filteredMaqams = useMemo(() => {
     if (typeFilter === "uroos") return [];
@@ -1018,13 +1061,25 @@ function AdminPagesManagement() {
                               <ExternalLink className="mr-1 h-3 w-3" /> Live
                             </Link>
                           </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => openEditor("maqam", m)}
-                            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                          >
-                            <Edit className="h-3 w-3" /> Edit Page &amp; Image
-                          </Button>
+                          {isSuperAdmin || (allot && (allot.userEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim() || allot.userId === currentUserId)) ? (
+                            <Button
+                              size="sm"
+                              onClick={() => openEditor("maqam", m)}
+                              className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                            >
+                              <Edit className="h-3 w-3" /> Edit Page &amp; Image
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              disabled
+                              variant="outline"
+                              className="h-8 text-xs gap-1.5 text-muted-foreground opacity-60 cursor-not-allowed"
+                              title="You are not authorized to edit this page because it is not allotted to your account."
+                            >
+                              <Lock className="h-3 w-3" /> Not Allotted
+                            </Button>
+                          )}
                         </div>
                       </Card>
                     );
@@ -1151,13 +1206,25 @@ function AdminPagesManagement() {
                               <ExternalLink className="mr-1 h-3 w-3" /> Live
                             </Link>
                           </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => openEditor("uroos", u)}
-                            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                          >
-                            <Edit className="h-3 w-3" /> Edit Page &amp; Image
-                          </Button>
+                          {isSuperAdmin || (allot && (allot.userEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim() || allot.userId === currentUserId)) ? (
+                            <Button
+                              size="sm"
+                              onClick={() => openEditor("uroos", u)}
+                              className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                            >
+                              <Edit className="h-3 w-3" /> Edit Page &amp; Image
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              disabled
+                              variant="outline"
+                              className="h-8 text-xs gap-1.5 text-muted-foreground opacity-60 cursor-not-allowed"
+                              title="You are not authorized to edit this page because it is not allotted to your account."
+                            >
+                              <Lock className="h-3 w-3" /> Not Allotted
+                            </Button>
+                          )}
                         </div>
                       </Card>
                     );
@@ -1992,23 +2059,36 @@ function AdminPagesManagement() {
                   </div>
                 )}
 
-                <DialogFooter className="gap-2 pt-4 border-t border-border">
-                  <Button type="button" variant="ghost" onClick={() => setEditItem(null)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={saving}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[140px]"
-                  >
-                    {saving ? (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Saving…
-                      </>
-                    ) : (
-                      "Save All Changes"
-                    )}
-                  </Button>
+                <DialogFooter className="gap-2 pt-4 border-t border-border flex flex-col sm:flex-row items-center justify-between">
+                  {!canSaveCurrentItem ? (
+                    <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium mr-auto">
+                      <Lock className="h-4 w-4 shrink-0" />
+                      <span>Viewing mode only: You can only edit pages allotted to your account.</span>
+                    </div>
+                  ) : !isSuperAdmin ? (
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium mr-auto">
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                      <span>Allotted to your account ({currentUserEmail})</span>
+                    </div>
+                  ) : null}
+                  <div className="flex items-center gap-2 ml-auto">
+                    <Button type="button" variant="ghost" onClick={() => setEditItem(null)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={saving || !canSaveCurrentItem}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[140px]"
+                    >
+                      {saving ? (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Saving…
+                        </>
+                      ) : (
+                        "Save All Changes"
+                      )}
+                    </Button>
+                  </div>
                 </DialogFooter>
               </form>
             )}

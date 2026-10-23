@@ -29,18 +29,24 @@ export function checkIsSuperAdmin(
     return true;
   }
 
-  // 2. Explicit role check
-  if (role === "super_admin") {
-    return true;
-  }
-
-  // 3. User metadata check (Supabase app_metadata or user_metadata)
+  // 2. User metadata check (Supabase app_metadata or user_metadata)
   const metaRole =
     userMetadata?.role ||
     userMetadata?.app_metadata?.role ||
     userMetadata?.user_metadata?.role;
   if (metaRole === "super_admin") {
     return true;
+  }
+
+  // 3. Explicit role check: only honored if no email identity is provided (mock/dev fallback)
+  // or if the email is a recognized super admin email. An explicit non-super admin email
+  // (e.g. admin@ziyarath.com or newadmin@ziyarath.com) CANNOT be elevated by passing role="super_admin".
+  if (role === "super_admin") {
+    if (!normalizedEmail) return true;
+    return (
+      SUPER_ADMIN_EMAILS.some((admin) => admin.toLowerCase() === normalizedEmail) ||
+      normalizedEmail.includes("superadmin")
+    );
   }
 
   return false;
