@@ -1,14 +1,31 @@
 import { Link } from "@tanstack/react-router";
 import { Github, Twitter, Instagram, Mail } from "lucide-react";
+import { useEffect, useState } from "react";
 import logoFull from "@/assets/ziyarath-logo.png";
+import { extractSubdomain, ROOT_DOMAIN } from "@/lib/subdomain-config";
 
 export function Footer() {
+  const [isSubdomain, setIsSubdomain] = useState(false);
+  const rootUrl = `https://${ROOT_DOMAIN}`;
+
+  useEffect(() => {
+    setIsSubdomain(Boolean(extractSubdomain(window.location.hostname)));
+  }, []);
+
   return (
     <footer className="relative mt-24 border-t border-border bg-card">
       <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="grid gap-10 md:grid-cols-4">
           <div className="md:col-span-2">
-            <img src={logoFull} alt="Ziyarath" className="h-10 w-auto" />
+            {isSubdomain ? (
+              <a href={rootUrl}>
+                <img src={logoFull} alt="Ziyarath" className="h-10 w-auto" />
+              </a>
+            ) : (
+              <Link to="/">
+                <img src={logoFull} alt="Ziyarath" className="h-10 w-auto" />
+              </Link>
+            )}
             <p className="mt-4 max-w-md text-sm text-muted-foreground leading-relaxed">
               A modern Islamic heritage discovery platform — exploring sacred mosques,
               dargahs, scholars and the rich Islamic history of Kerala, India and the world.
@@ -20,11 +37,23 @@ export function Footer() {
               Explore
             </h4>
             <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-              <li><Link to="/" className="hover:text-primary">Home</Link></li>
-              <li><Link to="/about" className="hover:text-primary">About</Link></li>
-              <li><Link to="/blog" className="hover:text-primary">Blog</Link></li>
-              <li><Link to="/contact" className="hover:text-primary">Contact</Link></li>
-              <li><Link to="/privacy" className="hover:text-primary">Privacy Policy</Link></li>
+              {isSubdomain ? (
+                <>
+                  <li><a href={rootUrl} className="hover:text-primary">Home</a></li>
+                  <li><a href={`${rootUrl}/about`} className="hover:text-primary">About</a></li>
+                  <li><a href={`${rootUrl}/blog`} className="hover:text-primary">Blog</a></li>
+                  <li><a href={`${rootUrl}/contact`} className="hover:text-primary">Contact</a></li>
+                  <li><a href={`${rootUrl}/privacy`} className="hover:text-primary">Privacy Policy</a></li>
+                </>
+              ) : (
+                <>
+                  <li><Link to="/" className="hover:text-primary">Home</Link></li>
+                  <li><Link to="/about" className="hover:text-primary">About</Link></li>
+                  <li><Link to="/blog" className="hover:text-primary">Blog</Link></li>
+                  <li><Link to="/contact" className="hover:text-primary">Contact</Link></li>
+                  <li><Link to="/privacy" className="hover:text-primary">Privacy Policy</Link></li>
+                </>
+              )}
             </ul>
           </div>
 

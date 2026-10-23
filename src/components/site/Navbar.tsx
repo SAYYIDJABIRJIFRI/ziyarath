@@ -1,11 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import { Moon, Sun, Menu, X, ShieldCheck } from "lucide-react";
+import { Moon, Sun, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
 import { AdminProfileMenu } from "./AdminProfileMenu";
 import logoMark from "@/assets/ziyarath-mark.png";
 import logoFull from "@/assets/ziyarath-logo.png";
+import { extractSubdomain, ROOT_DOMAIN } from "@/lib/subdomain-config";
 
 const NAV = [
   { to: "/", label: "Home" },
@@ -20,11 +21,14 @@ export function Navbar() {
   const { theme, toggle } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [isSubdomain, setIsSubdomain] = useState(false);
+  const rootUrl = `https://${ROOT_DOMAIN}`;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
+    setIsSubdomain(Boolean(extractSubdomain(window.location.hostname)));
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
@@ -38,31 +42,60 @@ export function Navbar() {
       )}
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link to="/" className="flex items-center group" aria-label="Ziyarath home">
-          <img
-            src={logoFull}
-            alt="Ziyarath"
-            className="hidden h-9 w-auto sm:block"
-          />
-          <img
-            src={logoMark}
-            alt="Ziyarath"
-            className="h-9 w-9 sm:hidden"
-          />
-        </Link>
+        {isSubdomain ? (
+          <a href={rootUrl} className="flex items-center group" aria-label="Ziyarath home">
+            <img
+              src={logoFull}
+              alt="Ziyarath"
+              className="hidden h-9 w-auto sm:block"
+            />
+            <img
+              src={logoMark}
+              alt="Ziyarath"
+              className="h-9 w-9 sm:hidden"
+            />
+          </a>
+        ) : (
+          <Link to="/" className="flex items-center group" aria-label="Ziyarath home">
+            <img
+              src={logoFull}
+              alt="Ziyarath"
+              className="hidden h-9 w-auto sm:block"
+            />
+            <img
+              src={logoMark}
+              alt="Ziyarath"
+              className="h-9 w-9 sm:hidden"
+            />
+          </Link>
+        )}
 
         <nav className="hidden md:flex items-center gap-8">
-          {NAV.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-              activeProps={{ className: "text-primary" }}
-              activeOptions={{ exact: item.to === "/" }}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {NAV.map((item) => {
+            const isExternalToRoot = isSubdomain && item.to !== "/uroos" && item.to !== "/maqam";
+            if (isExternalToRoot) {
+              return (
+                <a
+                  key={item.to}
+                  href={`${rootUrl}${item.to === "/" ? "" : item.to}`}
+                  className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                >
+                  {item.label}
+                </a>
+              );
+            }
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                activeProps={{ className: "text-primary" }}
+                activeOptions={{ exact: item.to === "/" }}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-2">
@@ -89,16 +122,31 @@ export function Navbar() {
       {open && (
         <div className="md:hidden border-t border-border bg-background/95 backdrop-blur">
           <nav className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3">
-            {NAV.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-accent"
-              >
-                {item.label}
-              </Link>
-            ))}
+            {NAV.map((item) => {
+              const isExternalToRoot = isSubdomain && item.to !== "/uroos" && item.to !== "/maqam";
+              if (isExternalToRoot) {
+                return (
+                  <a
+                    key={item.to}
+                    href={`${rootUrl}${item.to === "/" ? "" : item.to}`}
+                    onClick={() => setOpen(false)}
+                    className="rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-accent"
+                  >
+                    {item.label}
+                  </a>
+                );
+              }
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-accent"
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
             <div className="pt-2 border-t border-border mt-1">
               <AdminProfileMenu className="w-full justify-between" />
             </div>

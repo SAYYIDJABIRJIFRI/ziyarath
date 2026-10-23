@@ -40,7 +40,8 @@ import {
 import { cn } from "@/lib/utils";
 import { RequestDialog } from "@/components/site/RequestDialog";
 import { REGION_LABELS, type MaqamRegion } from "@/data/maqams";
-import { getMaqamUrl, getUroosUrl, isSubdomainMaqam, isSubdomainUroos } from "@/lib/subdomain-config";
+import { getMaqamUrl, getUroosUrl, isSubdomainMaqam, isSubdomainUroos, ROOT_DOMAIN } from "@/lib/subdomain-config";
+import { UroosDetailContent } from "@/components/site/UroosDetailContent";
 
 /* ---------- Search Schema ---------- */
 
@@ -49,40 +50,99 @@ const uroosViewEnum = z.enum(["featured", "grid", "timeline"]);
 const uroosConnEnum = z.enum(["all", "connected", "standalone"]);
 
 const uroosSearchSchema = z.object({
-  q: fallback(z.string(), "").default(""),
-  month: fallback(z.union([z.coerce.number().int().min(1).max(12), z.literal("all")]), "all").default("all"),
-  day: fallback(z.coerce.number().int().min(1).max(30).nullable(), null).default(null),
-  region: fallback(uroosRegionEnum, "all").default("all"),
-  view: fallback(uroosViewEnum, "featured").default("featured"),
-  conn: fallback(uroosConnEnum, "all").default("all"),
+  q: z.string().optional(),
+  month: z.union([z.coerce.number().int().min(1).max(12), z.literal("all")]).optional(),
+  day: z.coerce.number().int().min(1).max(30).nullable().optional(),
+  region: uroosRegionEnum.optional(),
+  view: uroosViewEnum.optional(),
+  conn: uroosConnEnum.optional(),
 });
 
 export type UroosSearch = z.infer<typeof uroosSearchSchema>;
 
 export const Route = createFileRoute("/uroos")({
   validateSearch: zodValidator(uroosSearchSchema),
-  loader: async () => {
-    const dynamicUroos = await listUroosPublicFn();
-    return { dynamicUroos };
+  head: ({ loaderData }) => {
+    if (loaderData?.isSubdomain && loaderData?.uroos) {
+      const u = loaderData.uroos;
+      const title = `${u.title} ${u.malayalamTitle ? `(${u.malayalamTitle})` : ""} — Ziyarath`;
+      const description = u.description.slice(0, 155);
+      const canonicalUrl = `https://${loaderData.subdomain}.${ROOT_DOMAIN}/uroos`;
+      return {
+        meta: [
+          { title },
+          { name: "description", content: description },
+          { property: "og:title", content: title },
+          { property: "og:description", content: description },
+          { property: "og:image", content: u.coverImage || "/assets/og-image.jpg" },
+          { property: "og:type", content: "event" },
+          { property: "og:url", content: canonicalUrl },
+        ],
+        links: [{ rel: "canonical", href: canonicalUrl }],
+      };
+    }
+
+    return {
+      meta: [
+        { title: "ഉറൂസ് കലണ്ടർ & സമഗ്ര ഗൈഡ് — Ziyarath" },
+        {
+          name: "description",
+          content:
+            "ഹിജ്റ വർഷത്തിലെ ഓരോ മാസത്തിലെയും ഉറൂസ് ദിനങ്ങളും മഹാന്മാരുടെ വിശദാംശങ്ങളും, സമഗ്ര സമർപ്പിത പേജുകളും.",
+        },
+        { property: "og:title", content: "ഉറൂസ് കലണ്ടർ & സമഗ്ര ഗൈഡ് — Ziyarath" },
+        {
+          property: "og:description",
+          content:
+            "ഹിജ്റ വർഷത്തിലെ ഓരോ മാസത്തിലെയും ഉറൂസ് ദിനങ്ങളും മഹാന്മാരുടെ വിശദാംശങ്ങളും, സമഗ്ര സമർപ്പിത പേജുകളും.",
+        },
+      ],
+    };
   },
-  head: () => ({
-    meta: [
-      { title: "ഉറൂസ് കലണ്ടർ & സമഗ്ര ഗൈഡ് — Ziyarath" },
-      {
-        name: "description",
-        content:
-          "ഹിജ്റ വർഷത്തിലെ ഓരോ മാസത്തിലെയും ഉറൂസ് ദിനങ്ങളും മഹാന്മാരുടെ വിശദാംശങ്ങളും, സമഗ്ര സമർപ്പിത പേജുകളും.",
+  loader: async () => {
+    const { getSubdomainUroosFn } = await import("@/lib/subdomain.functions");
+    const subData = await getSubdomainUroosFn({
+      data: {
+        hostname: typeof window !== "undefined" ? window.location.hostname : undefined,
       },
-      { property: "og:title", content: "ഉറൂസ് കലണ്ടർ & സമഗ്ര ഗൈഡ് — Ziyarath" },
-      {
-        property: "og:description",
-        content:
-          "ഹിജ്റ വർഷത്തിലെ ഓരോ മാസത്തിലെയും ഉറൂസ് ദിനങ്ങളും മഹാന്മാരുടെ വിശദാംശങ്ങളും, സമഗ്ര സമർപ്പിത പേജുകളും.",
-      },
-    ],
-  }),
-  component: UroosPage,
+    });
+    if (subData.isSubdomain && subData.uroos) {
+      return {
+        isSubdomain: true as const,
+        subdomain: subData.subdomain,
+        uroos: subData.uroos,
+        connectedMaqam: subData.connectedMaqam,
+        dynamicUroos: [] as DbUroos[],
+      };
+    }
+
+    const { listUroosPublicFn } = await import("@/lib/content.functions");
+    const dynamicUroos = await listUroosPublicFn();
+    return {
+      isSubdomain: false as const,
+      subdomain: null,
+      uroos: null,
+      connectedMaqam: null,
+      dynamicUroos,
+    };
+  },
+  component: UroosRouteComponent,
 });
+
+function UroosRouteComponent() {
+  const data = Route.useLoaderData();
+  if (data.isSubdomain && data.uroos) {
+    return (
+      <UroosDetailContent
+        uroos={data.uroos}
+        connectedMaqam={data.connectedMaqam}
+        isSubdomain={true}
+      />
+    );
+  }
+
+  return <UroosPage />;
+}
 
 /* ---------- helpers ---------- */
 
@@ -285,12 +345,12 @@ function UroosPage() {
   const navigate = useNavigate({ from: "/uroos" });
   const hijri = useMemo(currentHijriMonth, []);
 
-  // Sync state from query parameters
-  const active = search.month;
-  const selectedDay = search.day;
-  const region = search.region;
-  const view = search.view;
-  const connFilter = search.conn;
+  // Sync state from query parameters with fallbacks
+  const active = search.month ?? "all";
+  const selectedDay = search.day ?? null;
+  const region = search.region ?? "all";
+  const view = search.view ?? "featured";
+  const connFilter = search.conn ?? "all";
 
   // Local search query with immediate typing reflection
   const [query, setQuery] = useState(search.q || "");

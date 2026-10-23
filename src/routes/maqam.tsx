@@ -30,9 +30,8 @@ import {
 import { cn } from "@/lib/utils";
 import { RequestDialog } from "@/components/site/RequestDialog";
 import { Plus } from "lucide-react";
-import { getMaqamUrl, isSubdomainMaqam } from "@/lib/subdomain-config";
-
-
+import { getMaqamUrl, isSubdomainMaqam, ROOT_DOMAIN } from "@/lib/subdomain-config";
+import { MaqamDetailContent } from "@/components/site/MaqamDetailContent";
 
 const REGIONS: MaqamRegion[] = ["kerala", "india", "middle-east", "worldwide"];
 const CATEGORIES: MaqamCategory[] = [
@@ -56,71 +55,185 @@ const categoryEnum = z.enum([
 const PAGE_SIZE = 6;
 
 const maqamSearchSchema = z.object({
-  q: fallback(z.string(), "").default(""),
-  region: fallback(regionEnum, "all").default("all"),
-  category: fallback(categoryEnum, "all").default("all"),
-  page: fallback(z.number().int().min(1), 1).default(1),
+  q: z.string().optional(),
+  region: regionEnum.optional(),
+  category: categoryEnum.optional(),
+  page: z.coerce.number().int().min(1).optional(),
 });
 
 export const Route = createFileRoute("/maqam")({
   validateSearch: zodValidator(maqamSearchSchema),
-  head: () => ({
-    meta: [
-      { title: "Maqam Directory — Ziyarath" },
-      {
-        name: "description",
-        content:
-          "A directory of revered maqams and dargahs across Kerala, India, and the wider Muslim world. Filter by region and category to plan your ziyarath.",
-      },
-      { property: "og:title", content: "Maqam Directory — Ziyarath" },
-      {
-        property: "og:description",
-        content:
-          "Explore maqams and dargahs by region and category — Kerala, India, Middle East and beyond.",
-      },
-      { property: "og:url", content: "/maqam" },
-      { property: "og:type", content: "website" },
-    ],
-    links: [{ rel: "canonical", href: "/maqam" }],
-    scripts: [
-      {
-        type: "application/ld+json",
-        children: JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "ItemList",
-          name: "Maqam Directory",
-          itemListElement: MAQAMS.map((m, i) => ({
-            "@type": "ListItem",
-            position: i + 1,
-            name: m.name,
-            description: m.description,
-          })),
-        }),
-      },
-    ],
-  }),
+  head: ({ loaderData }) => {
+    if (loaderData?.isSubdomain && loaderData?.maqam) {
+      const m = loaderData.maqam;
+      const title = `${m.name} — Ziyarath`;
+      const description = m.description.slice(0, 155);
+      const url = `https://${loaderData.subdomain}.${ROOT_DOMAIN}/maqam`;
+
+      const placeLd: Record<string, unknown> = {
+        "@context": "https://schema.org",
+        "@type": ["Place", "TouristAttraction", "LandmarksOrHistoricalBuildings"],
+        "@id": url,
+        name: m.name,
+        alternateName: m.malayalamName,
+        description: m.description,
+        url,
+        address: {
+          "@type": "PostalAddress",
+          addressLocality: m.city,
+          addressCountry: m.country,
+          ...(m.addressDetail ? { streetAddress: m.addressDetail } : {}),
+        },
+        isAccessibleForFree: true,
+        publicAccess: true,
+        touristType: "Religious and heritage pilgrims",
+      };
+      if (m.coverImage) placeLd.image = `https://${ROOT_DOMAIN}${m.coverImage}`;
+
+      return {
+        meta: [
+          { title },
+          { name: "description", content: description },
+          { property: "og:title", content: title },
+          { property: "og:description", content: description },
+          { property: "og:type", content: "article" },
+          { property: "og:url", content: url },
+          ...(m.coverImage
+            ? [{ property: "og:image", content: `https://${ROOT_DOMAIN}${m.coverImage}` }]
+            : []),
+        ],
+        links: [{ rel: "canonical", href: url }],
+        scripts: [
+          {
+            type: "application/ld+json",
+            children: JSON.stringify(placeLd),
+          },
+        ],
+      };
+    }
+
+    return {
+      meta: [
+        { title: "Maqam Directory — Ziyarath" },
+        {
+          name: "description",
+          content:
+            "A directory of revered maqams and dargahs across Kerala, India, and the wider Muslim world. Filter by region and category to plan your ziyarath.",
+        },
+        { property: "og:title", content: "Maqam Directory — Ziyarath" },
+        {
+          property: "og:description",
+          content:
+            "Explore maqams and dargahs by region and category — Kerala, India, Middle East and beyond.",
+        },
+        { property: "og:url", content: "/maqam" },
+        { property: "og:type", content: "website" },
+      ],
+      links: [{ rel: "canonical", href: "/maqam" }],
+      scripts: [
+        {
+          type: "application/ld+json",
+          children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            name: "Maqam Directory",
+            itemListElement: MAQAMS.map((m, i) => ({
+              "@type": "ListItem",
+              position: i + 1,
+              name: m.name,
+              description: m.description,
+            })),
+          }),
+        },
+      ],
+    };
+  },
   loader: async () => {
+    const { getSubdomainMaqamFn } = await import("@/lib/subdomain.functions");
+    const subData = await getSubdomainMaqamFn({
+      data: {
+        hostname: typeof window !== "undefined" ? window.location.hostname : undefined,
+      },
+    });
+    if (subData.isSubdomain && subData.maqam) {
+      return {
+        isSubdomain: true as const,
+        subdomain: subData.subdomain,
+        maqam: subData.maqam,
+        connectedUroos: subData.connectedUroos,
+        dynamicMaqams: [] as Maqam[],
+      };
+    }
+
     const { listMaqamsPublicFn } = await import("@/lib/content.functions");
     const dynamicMaqams = await listMaqamsPublicFn();
-    return { dynamicMaqams };
+    return {
+      isSubdomain: false as const,
+      subdomain: null,
+      maqam: null,
+      connectedUroos: [],
+      dynamicMaqams,
+    };
   },
-  component: MaqamPage,
+  component: MaqamRouteComponent,
 });
 
-function MaqamPage() {
-  const { dynamicMaqams = MAQAMS } = Route.useLoaderData();
-  const { q: query, region, category, page } = Route.useSearch();
+function MaqamRouteComponent() {
+  const data = Route.useLoaderData();
+  if (data.isSubdomain && data.maqam) {
+    return (
+      <MaqamDetailContent
+        maqam={data.maqam}
+        connectedUroos={data.connectedUroos}
+        isSubdomain={true}
+      />
+    );
+  }
+
+  return <MaqamPage dynamicMaqams={data.dynamicMaqams || MAQAMS} />;
+}
+
+function MaqamPage({ dynamicMaqams = MAQAMS }: { dynamicMaqams?: Maqam[] }) {
+  const search = Route.useSearch();
+  const query = search.q || "";
+  const region = search.region || "all";
+  const category = search.category || "all";
+  const page = search.page || 1;
   const navigate = useNavigate({ from: "/maqam" });
 
   type MaqamSearch = z.infer<typeof maqamSearchSchema>;
   const setQuery = (v: string) =>
-    navigate({ search: (prev: MaqamSearch) => ({ ...prev, q: v, page: 1 }), replace: true });
+    navigate({
+      search: (prev: MaqamSearch) => ({
+        ...prev,
+        q: v.trim() ? v : undefined,
+        page: undefined,
+      }),
+      replace: true,
+    });
   const setRegion = (v: MaqamRegion | "all") =>
-    navigate({ search: (prev: MaqamSearch) => ({ ...prev, region: v, page: 1 }), replace: true });
+    navigate({
+      search: (prev: MaqamSearch) => ({
+        ...prev,
+        region: v === "all" ? undefined : v,
+        page: undefined,
+      }),
+      replace: true,
+    });
   const setCategory = (v: MaqamCategory | "all") =>
-    navigate({ search: (prev: MaqamSearch) => ({ ...prev, category: v, page: 1 }), replace: true });
+    navigate({
+      search: (prev: MaqamSearch) => ({
+        ...prev,
+        category: v === "all" ? undefined : v,
+        page: undefined,
+      }),
+      replace: true,
+    });
   const clearAll = () =>
-    navigate({ search: { q: "", region: "all", category: "all", page: 1 }, replace: true });
+    navigate({
+      search: {},
+      replace: true,
+    });
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

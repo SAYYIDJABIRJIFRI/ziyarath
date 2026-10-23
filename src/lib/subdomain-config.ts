@@ -43,11 +43,22 @@ export const ROOT_DOMAIN = "ziyarath.com";
  *   "localhost:3000" → null
  */
 export function extractSubdomain(hostname: string): string | null {
-  // Strip port if present
-  const host = hostname.split(":")[0];
+  if (!hostname) return null;
+  // Strip comma-separated proxy hosts and port if present
+  const firstHost = hostname.split(",")[0].trim();
+  const host = firstHost.split(":")[0].toLowerCase();
 
-  // Local development: treat as no subdomain
+  // Local development: treat as no subdomain unless testing with *.localhost
   if (host === "localhost" || host === "127.0.0.1") {
+    return null;
+  }
+
+  // Handle local development testing like mampuram.localhost
+  if (host.endsWith(".localhost")) {
+    const devPrefix = host.slice(0, -".localhost".length);
+    if (devPrefix in SUBDOMAIN_REGISTRY) {
+      return devPrefix;
+    }
     return null;
   }
 

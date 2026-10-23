@@ -132,18 +132,17 @@ function rewriteForSubdomain(request: Request): Request | Response | null {
     return Response.redirect(url.toString(), 301);
   }
 
-  // Rewrite /maqam → /maqam/{maqamId} for internal TanStack SSR handling
-  if (pathname === "/maqam" || pathname === "/maqam/") {
-    url.pathname = `/maqam/${entry.maqamId}`;
-    return new Request(url.toString(), request);
+  // General root pages redirect to the main domain
+  if (
+    pathname.startsWith("/about") ||
+    pathname.startsWith("/blog") ||
+    pathname.startsWith("/contact") ||
+    pathname.startsWith("/privacy")
+  ) {
+    return Response.redirect(`https://${ROOT_DOMAIN}${pathname}${url.search}`, 302);
   }
 
-  // Rewrite /uroos → /uroos/{uroosId} for internal TanStack SSR handling
-  if ((pathname === "/uroos" || pathname === "/uroos/") && entry.uroosId) {
-    url.pathname = `/uroos/${entry.uroosId}`;
-    return new Request(url.toString(), request);
-  }
-
+  // /maqam and /uroos routes are natively subdomain-aware in TanStack Start
   // All other paths (static assets, API, etc.) pass through unchanged
   return null;
 }
