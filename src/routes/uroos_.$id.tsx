@@ -8,7 +8,8 @@ export const Route = createFileRoute("/uroos_/$id")({
     const subdomain = getSubdomainForUroos(params.id);
     if (subdomain && typeof window !== "undefined") {
       const currentHost = window.location.hostname;
-      if (currentHost !== `${subdomain}.${ROOT_DOMAIN}`) {
+      const isLocal = currentHost === "localhost" || currentHost === "127.0.0.1" || currentHost.endsWith(".localhost");
+      if (!isLocal && currentHost !== `${subdomain}.${ROOT_DOMAIN}`) {
         window.location.href = `https://${subdomain}.${ROOT_DOMAIN}/uroos`;
       }
     }

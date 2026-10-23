@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { listAllotmentsFn } from "@/lib/content.functions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,9 +50,25 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [allotmentCount, setAllotmentCount] = useState<number | null>(null);
+  const listAllotFn = useServerFn(listAllotmentsFn);
 
   useEffect(() => {
     let mounted = true;
+
+    const checkAllotments = async (email: string, uid?: string) => {
+      try {
+        const allots: any = await listAllotFn();
+        if (!mounted || !allots) return;
+        const norm = email.toLowerCase().trim();
+        const userAllots = allots.filter(
+          (a: any) => a.userEmail?.toLowerCase() === norm || (uid && a.userId === uid)
+        );
+        setAllotmentCount(userAllots.length);
+      } catch {
+        // Fallback
+      }
+    };
 
     const checkUser = async () => {
       try {
@@ -59,6 +77,9 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
         if (data.session?.user) {
           setUser(data.session.user);
           setLoading(false);
+          if (data.session.user.email) {
+            checkAllotments(data.session.user.email, data.session.user.id);
+          }
           return;
         }
       } catch {
@@ -79,6 +100,9 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
             is_mock: true,
           });
           setLoading(false);
+          if (parsed.email) {
+            checkAllotments(parsed.email, parsed.id);
+          }
           return;
         }
       } catch {}
@@ -86,6 +110,7 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
       if (mounted) {
         setUser(null);
         setLoading(false);
+        setAllotmentCount(null);
       }
     };
 
@@ -96,6 +121,9 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
       if (!mounted) return;
       if (session?.user) {
         setUser(session.user);
+        if (session.user.email) {
+          checkAllotments(session.user.email, session.user.id);
+        }
       } else {
         checkUser();
       }
@@ -170,7 +198,10 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
   const email = user.email || "";
   const metaRole = user.app_metadata?.role || user.user_metadata?.role;
   const isSuperAdmin = email.toLowerCase().includes("superadmin") || metaRole === "super_admin";
-  const isUnallotted = email.toLowerCase().includes("newadmin") || metaRole === "unallotted_admin";
+  const isUnallotted =
+    !isSuperAdmin &&
+    (allotmentCount === 0 ||
+      (allotmentCount === null && (email.toLowerCase().includes("newadmin") || metaRole === "unallotted_admin")));
 
   const fullName =
     user.user_metadata?.full_name ||
@@ -192,6 +223,8 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
     ? "Super Admin"
     : isUnallotted
     ? "New Admin (Unallotted)"
+    : allotmentCount !== null
+    ? `Allotted Admin (${allotmentCount})`
     : "Allotted Admin";
 
   const roleSubtitle = isSuperAdmin
@@ -493,7 +526,7 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
                     ? "Super Admin (Unrestricted)"
                     : isUnallotted
                     ? "New Admin (Unallotted Access Only)"
-                    : "Allotted Admin (Scoped Access Only)"}
+                    : `Allotted Admin (${allotmentCount ?? 1} Allotted)`}
                 </Badge>
               </div>
 
@@ -505,8 +538,8 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
                   {isSuperAdmin
                     ? "Full master control: Super Admins are allowed to access Super Admin access, Allotted Admin access, and New Admin (Unallotted) preview access across all pages, requests, and allotments."
                     : isUnallotted
-                    ? "New Admin (Unallotted) access ONLY: You have an active verified login account with 0 pages allotted. Super Admin controls and Allotted Admin pages are restricted until pages are delegated by a Super Admin."
-                    : "Allotted Admin access ONLY: You can view, edit, and maintain only pages allotted to your account. Super Admin controls and unallotted modes are restricted."}
+                    ? "New Admin (Unallotted) access: You currently have an active verified login account with 0 pages allotted. A Super Admin must assign pages before you can edit content."
+                    : `Allotted Admin access: You have active access to manage and update ${allotmentCount ?? 1} allotted ${allotmentCount === 1 ? "page" : "pages"}. Non-allotted pages and Super Admin controls are restricted.`}
                 </p>
               </div>
             </div>

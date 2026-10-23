@@ -179,6 +179,21 @@ function AdminPagesManagement() {
 
   const [authenticatedEmail, setAuthenticatedEmail] = useState<string | null>(null);
   const [actualUserRole, setActualUserRole] = useState<"super_admin" | "admin">("super_admin");
+  const [currentPersona, setCurrentPersona] = useState<"super_admin" | "allotted_admin" | "unallotted_admin">(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("ziyarath_mock_user");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.persona) return parsed.persona;
+          if (parsed.email === "newadmin@ziyarath.com") return "unallotted_admin";
+          if (parsed.email === "admin@ziyarath.com") return "allotted_admin";
+          if (parsed.role === "super_admin") return "super_admin";
+        }
+      } catch {}
+    }
+    return "super_admin";
+  });
 
   // Automatically detect logged-in Supabase session on mount
   useEffect(() => {
@@ -201,6 +216,9 @@ function AdminPagesManagement() {
           setCurrentUserEmail(email);
           setCurrentUserId(uid);
           setCurrentRole(role);
+          if (isSuper && typeof window !== "undefined") {
+            sessionStorage.setItem("ziyarath_super_origin", "true");
+          }
         } else if (typeof window !== "undefined") {
           // Check if mock user is stored in localStorage
           try {
@@ -210,6 +228,9 @@ function AdminPagesManagement() {
               if (parsed.email) setCurrentUserEmail(parsed.email);
               if (parsed.id) setCurrentUserId(parsed.id);
               if (parsed.role) setCurrentRole(parsed.role === "admin" ? "admin" : "super_admin");
+              if (parsed.persona) setCurrentPersona(parsed.persona);
+              else if (parsed.email === "newadmin@ziyarath.com") setCurrentPersona("unallotted_admin");
+              else if (parsed.email === "admin@ziyarath.com") setCurrentPersona("allotted_admin");
             }
           } catch {}
         }
@@ -228,6 +249,9 @@ function AdminPagesManagement() {
           if (parsed.email) setCurrentUserEmail(parsed.email);
           if (parsed.id) setCurrentUserId(parsed.id);
           if (parsed.role) setCurrentRole(parsed.role === "admin" ? "admin" : "super_admin");
+          if (parsed.persona) setCurrentPersona(parsed.persona);
+          else if (parsed.email === "newadmin@ziyarath.com") setCurrentPersona("unallotted_admin");
+          else if (parsed.email === "admin@ziyarath.com") setCurrentPersona("allotted_admin");
         }
       } catch {}
     };
@@ -239,10 +263,26 @@ function AdminPagesManagement() {
     };
   }, []);
 
-  const isRealSuperAdmin =
-    actualUserRole === "super_admin" ||
-    checkIsSuperAdmin(authenticatedEmail) ||
-    (!authenticatedEmail && currentRole === "super_admin");
+  const isSuperSession = (() => {
+    if (actualUserRole === "super_admin") return true;
+    if (checkIsSuperAdmin(authenticatedEmail)) return true;
+    if (typeof window !== "undefined") {
+      try {
+        const flag = sessionStorage.getItem("ziyarath_super_origin");
+        if (flag === "true") return true;
+      } catch {}
+    }
+    // In mock/dev environment without Supabase session, Super Admin authority is allowed
+    return !authenticatedEmail;
+  })();
+
+  useEffect(() => {
+    if (isSuperSession && typeof window !== "undefined") {
+      sessionStorage.setItem("ziyarath_super_origin", "true");
+    }
+  }, [isSuperSession]);
+
+  const isRealSuperAdmin = isSuperSession;
 
   useEffect(() => {
     loadData(currentRole, currentUserEmail, currentUserId);
@@ -253,6 +293,7 @@ function AdminPagesManagement() {
       toast.error("Permission Denied: Only Super Admins can switch access personas.");
       return;
     }
+    setCurrentPersona(persona);
     let mockData = null;
     if (persona === "super_admin") {
       const superEmail = authenticatedEmail && checkIsSuperAdmin(authenticatedEmail) ? authenticatedEmail : "superadmin@ziyarath.com";
@@ -264,6 +305,7 @@ function AdminPagesManagement() {
         email: superEmail,
         id: superId,
         role: "super_admin",
+        persona: "super_admin",
         name: "Super Administrator",
       };
     } else if (persona === "allotted_admin") {
@@ -274,6 +316,7 @@ function AdminPagesManagement() {
         email: "admin@ziyarath.com",
         id: "admin-system",
         role: "admin",
+        persona: "allotted_admin",
         name: "Allotted Page Admin",
       };
     } else {
@@ -284,7 +327,8 @@ function AdminPagesManagement() {
         email: "newadmin@ziyarath.com",
         id: "newadmin-001",
         role: "admin",
-        name: "New Page Admin (Unallotted)",
+        persona: "unallotted_admin",
+        name: "New Page Admin",
       };
     }
     if (mockData) {
@@ -593,7 +637,7 @@ function AdminPagesManagement() {
                   <button
                     onClick={() => handleRoleSwitch("super_admin")}
                     className={`px-2.5 py-1 rounded-md transition-all ${
-                      currentRole === "super_admin"
+                      currentPersona === "super_admin"
                         ? "bg-primary text-primary-foreground font-semibold shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
@@ -604,31 +648,33 @@ function AdminPagesManagement() {
                   <button
                     onClick={() => handleRoleSwitch("allotted_admin")}
                     className={`px-2.5 py-1 rounded-md transition-all ${
-                      currentRole === "admin" && currentUserEmail !== "newadmin@ziyarath.com" && totalPagesCount > 0
+                      currentPersona === "allotted_admin"
                         ? "bg-primary text-primary-foreground font-semibold shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
-                    title="Allotted Admin Access"
+                    title="Allotted Admin Access (admin@ziyarath.com)"
                   >
                     Allotted Admin
                   </button>
                   <button
                     onClick={() => handleRoleSwitch("unallotted_admin")}
                     className={`px-2.5 py-1 rounded-md transition-all ${
-                      currentRole === "admin" && (currentUserEmail === "newadmin@ziyarath.com" || totalPagesCount === 0)
+                      currentPersona === "unallotted_admin"
                         ? "bg-primary text-primary-foreground font-semibold shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
-                    title="New Admin (Unallotted) Access"
+                    title="New Admin Access (newadmin@ziyarath.com)"
                   >
-                    New Admin (Unallotted)
+                    {currentUserEmail === "newadmin@ziyarath.com" && totalPagesCount > 0
+                      ? `New Admin (${totalPagesCount} Allotted)`
+                      : "New Admin (Unallotted)"}
                   </button>
                 </div>
               </div>
             ) : totalPagesCount > 0 ? (
               <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-300 font-medium">
                 <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                <span>Allotted Admin Access Only</span>
+                <span>Allotted Admin Access ({totalPagesCount} {totalPagesCount === 1 ? "Page" : "Pages"})</span>
               </div>
             ) : (
               <div className="inline-flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-800 dark:text-amber-300 font-medium">
@@ -637,7 +683,7 @@ function AdminPagesManagement() {
               </div>
             )}
 
-            {isSuperAdmin ? (
+            {isRealSuperAdmin && (
               <>
                 <Button asChild variant="outline" size="sm">
                   <Link to="/admin">
@@ -658,7 +704,8 @@ function AdminPagesManagement() {
                   </Link>
                 </Button>
               </>
-            ) : (
+            )}
+            {!isSuperAdmin && !isRealSuperAdmin && (
               <Button
                 variant="outline"
                 size="sm"
@@ -838,6 +885,30 @@ function AdminPagesManagement() {
           </Card>
         ) : (
           <div className="space-y-8">
+            {filteredMaqams.length === 0 && filteredUroos.length === 0 && (
+              <Card className="p-8 text-center border-dashed bg-card/60 max-w-md mx-auto my-6">
+                <Search className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <h4 className="font-semibold text-foreground text-sm">No matching pages found</h4>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  You have {totalPagesCount} {totalPagesCount === 1 ? "page" : "pages"} allotted to your account, but none match the current filter or search criteria.
+                </p>
+                <div className="mt-4 flex justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setQ("");
+                      setTypeFilter("all");
+                      setStatusFilter("all");
+                    }}
+                    className="text-xs"
+                  >
+                    Reset All Filters
+                  </Button>
+                </div>
+              </Card>
+            )}
+
             {/* Maqams Section */}
             {filteredMaqams.length > 0 && (
               <div>

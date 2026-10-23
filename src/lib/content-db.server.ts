@@ -205,6 +205,9 @@ export async function listMaqams(includeAllStatuses = false): Promise<DbMaqam[]>
         ? "SELECT * FROM maqams ORDER BY name ASC"
         : "SELECT * FROM maqams WHERE status = 'published' ORDER BY name ASC";
       const { results } = await db.prepare(query).all<Record<string, unknown>>();
+      const base = includeAllStatuses
+        ? memoryMaqams
+        : memoryMaqams.filter((m) => m.status === "published");
       if (results && results.length > 0) {
         // Map D1 snake_case to DbMaqam
         const mapped: DbMaqam[] = results.map((r) => ({
@@ -234,7 +237,15 @@ export async function listMaqams(includeAllStatuses = false): Promise<DbMaqam[]>
           createdAt: String(r.created_at),
           updatedAt: String(r.updated_at),
         }));
-        return mapped;
+        // Merge D1 records with base seed data (D1 overrides base by id)
+        const map = new Map<string, DbMaqam>();
+        for (const m of base) {
+          map.set(m.id, m);
+        }
+        for (const m of mapped) {
+          map.set(m.id, m);
+        }
+        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
       }
     } catch {
       // Fall through to memory
@@ -396,8 +407,11 @@ export async function listUroos(includeAllStatuses = false): Promise<DbUroos[]> 
         ? "SELECT * FROM uroos ORDER BY hijri_month ASC, hijri_day ASC"
         : "SELECT * FROM uroos WHERE status = 'published' ORDER BY hijri_month ASC, hijri_day ASC";
       const { results } = await db.prepare(query).all<Record<string, unknown>>();
+      const base = includeAllStatuses
+        ? memoryUroos
+        : memoryUroos.filter((u) => u.status === "published");
       if (results && results.length > 0) {
-        return results.map((r) => ({
+        const mapped: DbUroos[] = results.map((r) => ({
           id: String(r.id),
           title: String(r.title),
           malayalamTitle: r.malayalam_title ? String(r.malayalam_title) : undefined,
@@ -428,6 +442,17 @@ export async function listUroos(includeAllStatuses = false): Promise<DbUroos[]> 
           createdAt: String(r.created_at),
           updatedAt: String(r.updated_at),
         }));
+        // Merge D1 records with base seed data (D1 overrides base by id)
+        const map = new Map<string, DbUroos>();
+        for (const u of base) {
+          map.set(u.id, u);
+        }
+        for (const u of mapped) {
+          map.set(u.id, u);
+        }
+        return Array.from(map.values()).sort(
+          (a, b) => (a.hijriMonth || 1) - (b.hijriMonth || 1) || (a.hijriDay || 1) - (b.hijriDay || 1)
+        );
       }
     } catch {
       // Fallback to memory
@@ -604,7 +629,7 @@ export async function listAllotments(): Promise<PageAllotment[]> {
         .prepare("SELECT * FROM page_allotments ORDER BY created_at DESC")
         .all<Record<string, unknown>>();
       if (results && results.length > 0) {
-        return results.map((r) => ({
+        const d1Allots: PageAllotment[] = results.map((r) => ({
           id: String(r.id),
           userId: String(r.user_id),
           userEmail: String(r.user_email),
@@ -617,6 +642,17 @@ export async function listAllotments(): Promise<PageAllotment[]> {
           createdAt: String(r.created_at),
           updatedAt: String(r.updated_at),
         }));
+        // Merge D1 allotments with memoryAllotments (deduplicating by user_email + target_type + target_id)
+        const map = new Map<string, PageAllotment>();
+        for (const a of memoryAllotments) {
+          const key = `${a.userEmail.toLowerCase()}_${a.targetType}_${a.targetId}`;
+          map.set(key, a);
+        }
+        for (const a of d1Allots) {
+          const key = `${a.userEmail.toLowerCase()}_${a.targetType}_${a.targetId}`;
+          map.set(key, a);
+        }
+        return Array.from(map.values());
       }
     } catch {
       // Fallback
@@ -684,9 +720,14 @@ export async function createAllotment(input: {
     }
   }
 
-  // Remove duplicate if exists in memory
+  // Remove duplicate if exists in memory by email + type + target
   memoryAllotments = memoryAllotments.filter(
-    (a) => !(a.userId === allotment.userId && a.targetType === allotment.targetType && a.targetId === allotment.targetId)
+    (a) =>
+      !(
+        (a.userId === allotment.userId || a.userEmail.toLowerCase() === allotment.userEmail.toLowerCase()) &&
+        a.targetType === allotment.targetType &&
+        a.targetId === allotment.targetId
+      )
   );
   memoryAllotments.unshift(allotment);
   return allotment;
@@ -708,7 +749,8 @@ export async function revokeAllotment(id: string): Promise<boolean> {
 
 export async function getUserAllotments(userId: string, userEmail?: string | null): Promise<PageAllotment[]> {
   const all = await listAllotments();
-  return all.filter((a) => a.userId === userId || (userEmail && a.userEmail.toLowerCase() === userEmail.toLowerCase()));
+  const normalizedEmail = userEmail?.trim().toLowerCase();
+  return all.filter((a) => a.userId === userId || (normalizedEmail && a.userEmail.toLowerCase() === normalizedEmail));
 }
 
 // -------------------------------------------------------------
@@ -716,12 +758,14 @@ export async function getUserAllotments(userId: string, userEmail?: string | nul
 // -------------------------------------------------------------
 
 export async function listSystemUsers(): Promise<SystemUser[]> {
+  const allAllots = await listAllotments();
   const db = getDB();
+  let baseUsers: SystemUser[] = [...memoryUsers];
   if (db) {
     try {
       const { results } = await db.prepare("SELECT * FROM system_roles").all<Record<string, unknown>>();
       if (results && results.length > 0) {
-        return results.map((r) => ({
+        const d1Users: SystemUser[] = results.map((r) => ({
           id: String(r.id),
           userId: String(r.user_id),
           userEmail: String(r.user_email),
@@ -729,12 +773,23 @@ export async function listSystemUsers(): Promise<SystemUser[]> {
           displayName: String(r.display_name || r.user_email),
           createdAt: String(r.created_at),
         }));
+        const map = new Map<string, SystemUser>();
+        for (const u of memoryUsers) {
+          map.set(u.userEmail.toLowerCase(), u);
+        }
+        for (const u of d1Users) {
+          map.set(u.userEmail.toLowerCase(), u);
+        }
+        baseUsers = Array.from(map.values());
       }
     } catch {
       // Memory fallback
     }
   }
-  return [...memoryUsers];
+  return baseUsers.map((u) => ({
+    ...u,
+    allotmentCount: allAllots.filter((a) => a.userEmail.toLowerCase() === u.userEmail.toLowerCase()).length,
+  }));
 }
 
 export async function getUserRole(userId: string, email?: string | null): Promise<"super_admin" | "admin" | "user"> {

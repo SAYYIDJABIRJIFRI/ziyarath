@@ -70,4 +70,5 @@ export type SystemUser = {
   role: "super_admin" | "admin" | "user";
   displayName: string;
   createdAt: string;
+  allotmentCount?: number;
 };

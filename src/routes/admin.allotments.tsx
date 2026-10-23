@@ -592,8 +592,9 @@ function AdminAllotmentsPage() {
                         type="button"
                         onClick={() => setUserEmail(su.userEmail)}
                         className="underline hover:text-primary"
+                        title={`${su.displayName} (${su.allotmentCount ?? 0} allotted)`}
                       >
-                        {su.userEmail}
+                        {su.userEmail} ({su.allotmentCount ?? 0})
                       </button>
                     ))}
                   </div>
