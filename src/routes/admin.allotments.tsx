@@ -411,8 +411,36 @@ function AdminAllotmentsPage() {
         }
       }
     }
-    return null;
   }, [subdomainSelectedTargetId, subdomainTargetType, subdomainInput, maqams, uroosList]);
+
+  // Helper to find subdomain for a specific target page
+  const getSubdomainForTarget = (type: "maqam" | "uroos", id: string) => {
+    return (
+      subdomains.find(
+        (s) =>
+          (type === "maqam" && (s.maqamId === id || s.targetId === id)) ||
+          (type === "uroos" && (s.uroosId === id || s.targetId === id))
+      ) || null
+    );
+  };
+
+  // Check if the typed subdomain is already set for another page
+  const existingSubdomainForSlug = useMemo(() => {
+    const slug = subdomainInput
+      .toLowerCase()
+      .trim()
+      .replace(/^https?:\/\//i, "")
+      .replace(/\.ziyarath\.com.*$/i, "")
+      .replace(/[^a-z0-9-]/g, "");
+    if (!slug) return null;
+    return subdomains.find((s) => s.subdomain === slug) || null;
+  }, [subdomainInput, subdomains]);
+
+  // Check if currently selected page already has a subdomain assigned
+  const existingSubdomainForSelectedPage = useMemo(() => {
+    if (!subdomainSelectedTargetId) return null;
+    return getSubdomainForTarget(subdomainTargetType, subdomainSelectedTargetId);
+  }, [subdomainSelectedTargetId, subdomainTargetType, subdomains]);
 
   if (!isSuperAdmin) {
     return (
@@ -658,16 +686,36 @@ function AdminAllotmentsPage() {
                       filteredAllotments.map((allotment) => (
                         <tr key={allotment.id} className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-3 font-medium text-foreground">
-                            <div className="flex items-center gap-2">
-                              {allotment.targetType === "maqam" ? (
-                                <Building2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                              ) : (
-                                <Sparkles className="h-4 w-4 text-primary shrink-0" />
-                              )}
-                              <span>{allotment.targetTitle}</span>
-                              <Badge variant="outline" className="text-[10px] px-1 py-0 font-mono">
-                                {allotment.targetId}
-                              </Badge>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                {allotment.targetType === "maqam" ? (
+                                  <Building2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                                ) : (
+                                  <Sparkles className="h-4 w-4 text-primary shrink-0" />
+                                )}
+                                <span>{allotment.targetTitle}</span>
+                                <Badge variant="outline" className="text-[10px] px-1 py-0 font-mono">
+                                  {allotment.targetId}
+                                </Badge>
+                              </div>
+                              {(() => {
+                                const sub = getSubdomainForTarget(allotment.targetType, allotment.targetId);
+                                if (!sub) return null;
+                                return (
+                                  <div className="flex items-center gap-1.5 pl-6">
+                                    <a
+                                      href={`https://${sub.subdomain}.${ROOT_DOMAIN}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 rounded bg-primary/10 border border-primary/20 px-1.5 py-0.5 text-[10px] font-mono text-primary hover:bg-primary/20 transition-colors"
+                                      title={`Live at https://${sub.subdomain}.${ROOT_DOMAIN}`}
+                                    >
+                                      <Globe className="h-2.5 w-2.5" />
+                                      {sub.subdomain}.{ROOT_DOMAIN}
+                                    </a>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </td>
                           <td className="px-4 py-3">
@@ -1029,16 +1077,22 @@ function AdminAllotmentsPage() {
                 >
                   <option value="">Select a page…</option>
                   {targetType === "maqam"
-                    ? maqams.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name} ({m.city})
-                        </option>
-                      ))
-                    : uroosList.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.title} ({u.city})
-                        </option>
-                      ))}
+                    ? maqams.map((m) => {
+                        const sub = getSubdomainForTarget("maqam", m.id);
+                        return (
+                          <option key={m.id} value={m.id}>
+                            {m.name} ({m.city}){sub ? ` — [🌐 ${sub.subdomain}.${ROOT_DOMAIN}]` : ""}
+                          </option>
+                        );
+                      })
+                    : uroosList.map((u) => {
+                        const sub = getSubdomainForTarget("uroos", u.id);
+                        return (
+                          <option key={u.id} value={u.id}>
+                            {u.title} ({u.city}){sub ? ` — [🌐 ${sub.subdomain}.${ROOT_DOMAIN}]` : ""}
+                          </option>
+                        );
+                      })}
                 </select>
               </div>
 
@@ -1135,6 +1189,42 @@ function AdminAllotmentsPage() {
                 <p className="text-[11px] text-muted-foreground">
                   Use lowercase letters, numbers, and hyphens (e.g. <code className="text-primary font-semibold">madavoor</code>, <code className="text-primary font-semibold">ajmer</code>, <code className="text-primary font-semibold">kondotty</code>).
                 </p>
+
+                {/* Real-time Subdomain Collision / Already-Set Status */}
+                {subdomainInput && existingSubdomainForSlug && (
+                  <div
+                    className={`rounded-md p-2.5 text-xs flex items-start gap-2 border ${
+                      existingSubdomainForSlug.targetId === subdomainSelectedTargetId
+                        ? "bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-300"
+                        : "bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300"
+                    }`}
+                  >
+                    {existingSubdomainForSlug.targetId === subdomainSelectedTargetId ? (
+                      <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                    )}
+                    <div>
+                      {existingSubdomainForSlug.targetId === subdomainSelectedTargetId ? (
+                        <span>
+                          <strong>Already assigned to this page:</strong> Submitting will update its routing notes.
+                        </span>
+                      ) : (
+                        <span>
+                          <strong>⚠️ Subdomain already set!</strong> Currently assigned to{" "}
+                          <strong>"{existingSubdomainForSlug.targetTitle}"</strong> ({existingSubdomainForSlug.targetType}). Saving will overwrite and re-assign{" "}
+                          <code className="font-mono font-bold">https://{existingSubdomainForSlug.subdomain}.{ROOT_DOMAIN}</code> to this page!
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {subdomainInput && !existingSubdomainForSlug && subdomainInput.length >= 2 && (
+                  <div className="rounded-md bg-emerald-500/10 border border-emerald-500/30 p-2 text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <span>Subdomain <strong>{subdomainInput}.{ROOT_DOMAIN}</strong> is available to assign!</span>
+                  </div>
+                )}
               </div>
 
               {/* Real-time Subdomain Live Preview Card */}
@@ -1204,17 +1294,59 @@ function AdminAllotmentsPage() {
                 >
                   <option value="">Select a page to map…</option>
                   {subdomainTargetType === "maqam"
-                    ? maqams.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name} ({m.city}, {m.region})
-                        </option>
-                      ))
-                    : uroosList.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.title} ({u.city})
-                        </option>
-                      ))}
+                    ? maqams.map((m) => {
+                        const existing = getSubdomainForTarget("maqam", m.id);
+                        return (
+                          <option key={m.id} value={m.id}>
+                            {m.name} ({m.city}, {m.region}){existing ? ` — [🌐 ${existing.subdomain}.${ROOT_DOMAIN}]` : ""}
+                          </option>
+                        );
+                      })
+                    : uroosList.map((u) => {
+                        const existing = getSubdomainForTarget("uroos", u.id);
+                        return (
+                          <option key={u.id} value={u.id}>
+                            {u.title} ({u.city}){existing ? ` — [🌐 ${existing.subdomain}.${ROOT_DOMAIN}]` : ""}
+                          </option>
+                        );
+                      })}
                 </select>
+
+                {/* If selected page already has a subdomain assigned */}
+                {existingSubdomainForSelectedPage && (
+                  <div className="rounded-md bg-emerald-500/10 border border-emerald-500/30 p-2.5 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <div>
+                        <span className="font-semibold">Page Already Has Subdomain: </span>
+                        <a
+                          href={`https://${existingSubdomainForSelectedPage.subdomain}.${ROOT_DOMAIN}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono underline font-bold"
+                        >
+                          https://{existingSubdomainForSelectedPage.subdomain}.{ROOT_DOMAIN}
+                        </a>
+                      </div>
+                    </div>
+                    {subdomainInput !== existingSubdomainForSelectedPage.subdomain && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-[10px] px-2 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/20"
+                        onClick={() => {
+                          setSubdomainInput(existingSubdomainForSelectedPage.subdomain);
+                          if (existingSubdomainForSelectedPage.notes) {
+                            setSubdomainNotes(existingSubdomainForSelectedPage.notes);
+                          }
+                        }}
+                      >
+                        Load Prefix ({existingSubdomainForSelectedPage.subdomain})
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Auto-detected connected link preview */}
