@@ -9,25 +9,47 @@
  *   "madavoor": { maqamId: "madavoor", uroosId: "madavoor-uroos" },
  */
 export type SubdomainEntry = {
-  /** The maqam ID (matches the `id` field in maqams data) */
-  maqamId: string;
+  /** The maqam ID (matches the `id` field in maqams data), or null if standalone uroos */
+  maqamId: string | null;
   /** The uroos ID linked to this maqam (matches uroos `id` field), or null if none */
   uroosId: string | null;
+  targetType?: "maqam" | "uroos";
+  targetId?: string;
+  targetTitle?: string;
 };
 
 /**
  * Registry of subdomains that have dedicated subdomain routing.
  * Key = subdomain name (e.g. "mampuram" for mampuram.ziyarath.com)
+ * Dynamically synchronized from D1 database.
  */
 export const SUBDOMAIN_REGISTRY: Record<string, SubdomainEntry> = {
   mampuram: {
     maqamId: "mampuram",
     uroosId: "mampuram-uroos",
+    targetType: "maqam",
+    targetId: "mampuram",
+    targetTitle: "Mampuram Maqam",
   },
-  // Add more subdomain-enabled places here:
-  // madavoor: { maqamId: "madavoor", uroosId: "madavoor-uroos" },
-  // beemapally: { maqamId: "beemapally", uroosId: "beemapally-uroos" },
 };
+
+/**
+ * Synchronize in-memory registry with dynamic mappings from D1 database.
+ */
+export function syncSubdomainRegistry(entries: Record<string, SubdomainEntry>) {
+  for (const key of Object.keys(SUBDOMAIN_REGISTRY)) {
+    if (key !== "mampuram") {
+      delete SUBDOMAIN_REGISTRY[key];
+    }
+  }
+  for (const [key, value] of Object.entries(entries)) {
+    const norm = key.toLowerCase().trim();
+    if (norm) {
+      SUBDOMAIN_REGISTRY[norm] = value;
+    }
+  }
+}
+
 
 /** The root domain (without subdomain) */
 export const ROOT_DOMAIN = "ziyarath.com";

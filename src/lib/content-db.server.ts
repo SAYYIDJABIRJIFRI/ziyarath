@@ -5,11 +5,12 @@ import { getDB } from "./requests-db.server";
 import { MAQAMS, type Maqam } from "@/data/maqams";
 import { insertAudit } from "./requests-db.server";
 
-import type { DbMaqam, DbUroos, PageAllotment, SystemUser } from "@/types/content";
-export type { DbMaqam, DbUroos, PageAllotment, SystemUser };
+import type { DbMaqam, DbUroos, PageAllotment, SystemUser, SubdomainMapping } from "@/types/content";
+export type { DbMaqam, DbUroos, PageAllotment, SystemUser, SubdomainMapping };
 export { insertAudit } from "./requests-db.server";
 import { ALL_DEDICATED_UROOS } from "@/data/uroos-pages";
 import { checkIsSuperAdmin } from "./auth-roles";
+import { syncSubdomainRegistry, type SubdomainEntry } from "./subdomain-config";
 
 // -------------------------------------------------------------
 // Seed In-Memory Store
@@ -89,11 +90,28 @@ const seedUsers: SystemUser[] = [
   }
 ];
 
+const seedSubdomains: SubdomainMapping[] = [
+  {
+    subdomain: "mampuram",
+    targetType: "maqam",
+    targetId: "mampuram",
+    targetTitle: "Mampuram Maqam",
+    maqamId: "mampuram",
+    uroosId: "mampuram-uroos",
+    notes: "Heritage primary subdomain",
+    assignedBy: "superadmin-001",
+    assignedByEmail: "superadmin@ziyarath.com",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  },
+];
+
 // Memory stores
 let memoryMaqams: DbMaqam[] = [...seedMaqams];
 let memoryUroos: DbUroos[] = [...seedUroos];
 let memoryAllotments: PageAllotment[] = [...seedAllotments];
 let memoryUsers: SystemUser[] = [...seedUsers];
+let memorySubdomains: SubdomainMapping[] = [...seedSubdomains];
 
 // -------------------------------------------------------------
 // Maqam Operations
@@ -209,6 +227,25 @@ export async function ensureContentSchema(db: any): Promise<void> {
       )
       .run();
 
+    // 5. subdomain_mappings table
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS subdomain_mappings (
+          subdomain TEXT PRIMARY KEY,
+          target_type TEXT NOT NULL CHECK (target_type IN ('maqam', 'uroos')),
+          target_id TEXT NOT NULL,
+          target_title TEXT NOT NULL,
+          maqam_id TEXT,
+          uroos_id TEXT,
+          notes TEXT,
+          assigned_by TEXT NOT NULL,
+          assigned_by_email TEXT,
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        )`
+      )
+      .run();
+
     // Indices
     try {
       await db.prepare("CREATE INDEX IF NOT EXISTS idx_allotments_user ON page_allotments(user_id)").run();
@@ -216,6 +253,7 @@ export async function ensureContentSchema(db: any): Promise<void> {
       await db.prepare("CREATE INDEX IF NOT EXISTS idx_system_roles_user ON system_roles(user_id)").run();
       await db.prepare("CREATE INDEX IF NOT EXISTS idx_maqams_region ON maqams(region)").run();
       await db.prepare("CREATE INDEX IF NOT EXISTS idx_uroos_maqam_id ON uroos(maqam_id)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_subdomains_target ON subdomain_mappings(target_type, target_id)").run();
     } catch {
       // Non-fatal
     }
@@ -356,6 +394,30 @@ export async function seedMissingPagesToD1(db: any): Promise<void> {
           a.notes,
           a.createdAt,
           a.updatedAt
+        )
+        .run();
+    }
+
+    // 5. Seed default subdomain_mappings
+    const insertSubStmt = db.prepare(`
+      INSERT INTO subdomain_mappings (subdomain, target_type, target_id, target_title, maqam_id, uroos_id, notes, assigned_by, assigned_by_email, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(subdomain) DO NOTHING
+    `);
+    for (const s of seedSubdomains) {
+      await insertSubStmt
+        .bind(
+          s.subdomain,
+          s.targetType,
+          s.targetId,
+          s.targetTitle,
+          s.maqamId,
+          s.uroosId,
+          s.notes,
+          s.assignedBy,
+          s.assignedByEmail,
+          s.createdAt,
+          s.updatedAt
         )
         .run();
     }
@@ -1460,3 +1522,288 @@ export async function handleUpdatePageContent(data: {
 
   return { success: true };
 }
+
+// -------------------------------------------------------------
+// Subdomain Operations (Super Admin Only)
+// -------------------------------------------------------------
+
+function syncRegistryFromMappings(mappings: SubdomainMapping[]) {
+  const dict: Record<string, SubdomainEntry> = {};
+  for (const m of mappings) {
+    dict[m.subdomain.toLowerCase().trim()] = {
+      maqamId: m.maqamId,
+      uroosId: m.uroosId,
+      targetType: m.targetType,
+      targetId: m.targetId,
+      targetTitle: m.targetTitle,
+    };
+  }
+  syncSubdomainRegistry(dict);
+}
+
+export async function listSubdomainMappings(): Promise<SubdomainMapping[]> {
+  const db = getDB();
+  if (db) {
+    try {
+      await ensureContentSchema(db);
+      const { results } = await db
+        .prepare("SELECT * FROM subdomain_mappings ORDER BY created_at DESC")
+        .all<Record<string, unknown>>();
+      if (results && results.length > 0) {
+        const d1Mappings: SubdomainMapping[] = results.map((r) => ({
+          subdomain: String(r.subdomain),
+          targetType: (r.target_type as "maqam" | "uroos") || "maqam",
+          targetId: String(r.target_id),
+          targetTitle: String(r.target_title || r.target_id),
+          maqamId: r.maqam_id ? String(r.maqam_id) : null,
+          uroosId: r.uroos_id ? String(r.uroos_id) : null,
+          notes: r.notes ? String(r.notes) : null,
+          assignedBy: String(r.assigned_by || "super_admin"),
+          assignedByEmail: r.assigned_by_email ? String(r.assigned_by_email) : null,
+          createdAt: String(r.created_at || "2026-01-01T00:00:00.000Z"),
+          updatedAt: String(r.updated_at || "2026-01-01T00:00:00.000Z"),
+        }));
+        memorySubdomains = d1Mappings;
+        syncRegistryFromMappings(d1Mappings);
+        return d1Mappings;
+      }
+    } catch (err) {
+      console.warn("[D1 Content] listSubdomainMappings error:", err);
+    }
+  }
+  syncRegistryFromMappings(memorySubdomains);
+  return memorySubdomains;
+}
+
+export async function getSubdomainMapping(subdomain: string): Promise<SubdomainMapping | null> {
+  const all = await listSubdomainMappings();
+  const slug = subdomain.toLowerCase().trim();
+  return all.find((m) => m.subdomain === slug) || null;
+}
+
+export type AssignSubdomainPayload = {
+  subdomain: string;
+  targetType: "maqam" | "uroos";
+  targetId: string;
+  notes?: string;
+  assignedBy: string;
+  assignedByEmail?: string | null;
+  assignedByRole?: string;
+};
+
+export async function assignSubdomain(payload: AssignSubdomainPayload): Promise<SubdomainMapping> {
+  // Authorization: Only Super Admin can assign subdomains
+  const hasSuper = checkIsSuperAdmin(payload.assignedByEmail, payload.assignedByRole);
+  if (!hasSuper) {
+    throw new Error("Permission Denied: Only Super Admins can assign or modify dedicated subdomains.");
+  }
+
+  const rawSub = payload.subdomain.toLowerCase().trim();
+  // Strip protocol, paths, or domain if user typed https://madavoor.ziyarath.com
+  const slug = rawSub
+    .replace(/^https?:\/\//i, "")
+    .replace(/\.ziyarath\.com.*$/i, "")
+    .replace(/\.localhost.*$/i, "")
+    .replace(/[^a-z0-9-]/g, "")
+    .trim();
+
+  // Validate slug
+  if (!slug || slug.length < 2 || slug.length > 30) {
+    throw new Error("Subdomain must be between 2 and 30 characters long.");
+  }
+  if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(slug)) {
+    throw new Error("Subdomain can only contain lowercase letters, numbers, and hyphens (cannot start or end with a hyphen).");
+  }
+
+  const RESERVED_SUBDOMAINS = new Set([
+    "www", "api", "admin", "app", "mail", "ftp", "assets", "static", "auth",
+    "dev", "staging", "ziyarath", "status", "blog", "cdn", "dns", "ns1", "ns2", "smtp", "pop", "imap", "m"
+  ]);
+  if (RESERVED_SUBDOMAINS.has(slug)) {
+    throw new Error(`The subdomain "${slug}" is reserved for system infrastructure and cannot be assigned.`);
+  }
+
+  // Find target page title and connected items
+  let targetTitle = payload.targetId;
+  let maqamId: string | null = null;
+  let uroosId: string | null = null;
+
+  if (payload.targetType === "maqam") {
+    const { maqam, connectedUroos } = await getMaqamById(payload.targetId);
+    if (!maqam) {
+      throw new Error(`Maqam page "${payload.targetId}" not found.`);
+    }
+    targetTitle = maqam.name;
+    maqamId = maqam.id;
+    if (connectedUroos && connectedUroos.length > 0) {
+      uroosId = connectedUroos[0].id;
+    }
+  } else {
+    // Uroos
+    const { uroos, connectedMaqam } = await getUroosById(payload.targetId);
+    if (!uroos) {
+      throw new Error(`Uroos page "${payload.targetId}" not found.`);
+    }
+    targetTitle = uroos.title;
+    uroosId = uroos.id;
+    if (connectedMaqam) {
+      maqamId = connectedMaqam.id;
+    }
+  }
+
+  const now = new Date().toISOString();
+  const mapping: SubdomainMapping = {
+    subdomain: slug,
+    targetType: payload.targetType,
+    targetId: payload.targetId,
+    targetTitle,
+    maqamId,
+    uroosId,
+    notes: payload.notes?.trim() || null,
+    assignedBy: payload.assignedBy,
+    assignedByEmail: payload.assignedByEmail || null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const db = getDB();
+  if (db) {
+    try {
+      await ensureContentSchema(db);
+      await db
+        .prepare(
+          `INSERT INTO subdomain_mappings (
+            subdomain, target_type, target_id, target_title, maqam_id, uroos_id, notes, assigned_by, assigned_by_email, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(subdomain) DO UPDATE SET
+            target_type = excluded.target_type,
+            target_id = excluded.target_id,
+            target_title = excluded.target_title,
+            maqam_id = excluded.maqam_id,
+            uroos_id = excluded.uroos_id,
+            notes = excluded.notes,
+            assigned_by = excluded.assigned_by,
+            assigned_by_email = excluded.assigned_by_email,
+            updated_at = excluded.updated_at`
+        )
+        .bind(
+          mapping.subdomain,
+          mapping.targetType,
+          mapping.targetId,
+          mapping.targetTitle,
+          mapping.maqamId,
+          mapping.uroosId,
+          mapping.notes,
+          mapping.assignedBy,
+          mapping.assignedByEmail,
+          mapping.createdAt,
+          mapping.updatedAt
+        )
+        .run();
+    } catch (err: any) {
+      if (String(err?.message || err).includes("no such table")) {
+        contentSchemaInitialized = false;
+        await ensureContentSchema(db);
+        await db
+          .prepare(
+            `INSERT INTO subdomain_mappings (
+              subdomain, target_type, target_id, target_title, maqam_id, uroos_id, notes, assigned_by, assigned_by_email, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(subdomain) DO UPDATE SET
+              target_type = excluded.target_type,
+              target_id = excluded.target_id,
+              target_title = excluded.target_title,
+              maqam_id = excluded.maqam_id,
+              uroos_id = excluded.uroos_id,
+              notes = excluded.notes,
+              assigned_by = excluded.assigned_by,
+              assigned_by_email = excluded.assigned_by_email,
+              updated_at = excluded.updated_at`
+          )
+          .bind(
+            mapping.subdomain,
+            mapping.targetType,
+            mapping.targetId,
+            mapping.targetTitle,
+            mapping.maqamId,
+            mapping.uroosId,
+            mapping.notes,
+            mapping.assignedBy,
+            mapping.assignedByEmail,
+            mapping.createdAt,
+            mapping.updatedAt
+          )
+          .run();
+      } else {
+        console.warn("[D1 Content] assignSubdomain D1 error:", err);
+      }
+    }
+  }
+
+  // Update memory
+  memorySubdomains = memorySubdomains.filter((m) => m.subdomain !== slug);
+  memorySubdomains.unshift(mapping);
+  syncRegistryFromMappings(memorySubdomains);
+
+  // Insert audit record
+  await insertAudit({
+    action: "allot",
+    request_id: `subdomain-${slug}`,
+    request_type: payload.targetType,
+    request_subject: `${slug}.ziyarath.com -> ${targetTitle}`,
+    actor_id: payload.assignedBy,
+    actor_email: payload.assignedByEmail || null,
+    notes: `Assigned subdomain https://${slug}.ziyarath.com to ${payload.targetType} "${targetTitle}" (${payload.targetId}). Notes: ${mapping.notes || "None"}`,
+  });
+
+  return mapping;
+}
+
+export async function removeSubdomain(
+  subdomain: string,
+  actor?: { id?: string; email?: string | null; role?: string }
+): Promise<boolean> {
+  const hasSuper = checkIsSuperAdmin(actor?.email, actor?.role);
+  if (!hasSuper) {
+    throw new Error("Permission Denied: Only Super Admins can remove subdomain assignments.");
+  }
+
+  const slug = subdomain.toLowerCase().trim();
+  const existing = memorySubdomains.find((m) => m.subdomain === slug);
+
+  const db = getDB();
+  if (db) {
+    try {
+      await ensureContentSchema(db);
+      await db.prepare("DELETE FROM subdomain_mappings WHERE subdomain = ?").bind(slug).run();
+    } catch (err) {
+      console.warn("[D1 Content] removeSubdomain error:", err);
+    }
+  }
+
+  memorySubdomains = memorySubdomains.filter((m) => m.subdomain !== slug);
+  syncRegistryFromMappings(memorySubdomains);
+
+  if (existing) {
+    await insertAudit({
+      action: "revoke",
+      request_id: `subdomain-${slug}`,
+      request_type: existing.targetType,
+      request_subject: `${slug}.ziyarath.com`,
+      actor_id: actor?.id || "super_admin",
+      actor_email: actor?.email || null,
+      notes: `Removed subdomain https://${slug}.ziyarath.com previously assigned to ${existing.targetType} "${existing.targetTitle}"`,
+    });
+  }
+
+  return true;
+}
+
+export async function ensureSubdomainsLoaded(): Promise<void> {
+  try {
+    await listSubdomainMappings();
+  } catch {
+    // Non-blocking
+  }
+}
+

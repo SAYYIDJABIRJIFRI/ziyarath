@@ -42,18 +42,23 @@ export const getSubdomainMaqamFn = createServerFn({ method: "GET" })
       host = window.location.hostname;
     }
 
+    const { listSubdomainMappings } = await import("./content-db.server");
+    await listSubdomainMappings(); // Sync SUBDOMAIN_REGISTRY from D1
+
     const subdomain = extractSubdomain(host);
     if (subdomain && subdomain in SUBDOMAIN_REGISTRY) {
       const entry = SUBDOMAIN_REGISTRY[subdomain];
-      const { getMaqamById } = await import("./content-db.server");
-      const { maqam, connectedUroos } = await getMaqamById(entry.maqamId);
-      return {
-        isSubdomain: true,
-        subdomain,
-        entry,
-        maqam,
-        connectedUroos: connectedUroos || [],
-      };
+      if (entry.maqamId) {
+        const { getMaqamById } = await import("./content-db.server");
+        const { maqam, connectedUroos } = await getMaqamById(entry.maqamId);
+        return {
+          isSubdomain: true,
+          subdomain,
+          entry,
+          maqam,
+          connectedUroos: connectedUroos || [],
+        };
+      }
     }
 
     return {
@@ -104,6 +109,9 @@ export const getSubdomainUroosFn = createServerFn({ method: "GET" })
       host = window.location.hostname;
     }
 
+    const { listSubdomainMappings } = await import("./content-db.server");
+    await listSubdomainMappings(); // Sync SUBDOMAIN_REGISTRY from D1
+
     const subdomain = extractSubdomain(host);
     if (subdomain && subdomain in SUBDOMAIN_REGISTRY) {
       const entry = SUBDOMAIN_REGISTRY[subdomain];
@@ -128,3 +136,66 @@ export const getSubdomainUroosFn = createServerFn({ method: "GET" })
       connectedMaqam: null,
     };
   });
+
+// -------------------------------------------------------------
+// Super Admin Subdomain Management Server Functions
+// -------------------------------------------------------------
+
+export const listSubdomainMappingsFn = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const { listSubdomainMappings } = await import("./content-db.server");
+    return await listSubdomainMappings();
+  });
+
+export const getActiveSubdomainsPublicFn = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const { listSubdomainMappings } = await import("./content-db.server");
+    await listSubdomainMappings();
+    return SUBDOMAIN_REGISTRY;
+  });
+
+export const assignSubdomainFn = createServerFn({ method: "POST" })
+  .validator(
+    (d: {
+      subdomain: string;
+      targetType: "maqam" | "uroos";
+      targetId: string;
+      notes?: string;
+      assignedBy: string;
+      assignedByEmail?: string;
+      assignedByRole?: string;
+    }) => d
+  )
+  .handler(async ({ data }) => {
+    const { assignSubdomain } = await import("./content-db.server");
+    const result = await assignSubdomain({
+      subdomain: data.subdomain,
+      targetType: data.targetType,
+      targetId: data.targetId,
+      notes: data.notes,
+      assignedBy: data.assignedBy,
+      assignedByEmail: data.assignedByEmail,
+      assignedByRole: data.assignedByRole,
+    });
+    return { success: true, mapping: result };
+  });
+
+export const removeSubdomainFn = createServerFn({ method: "POST" })
+  .validator(
+    (d: {
+      subdomain: string;
+      removerId: string;
+      removerEmail?: string;
+      removerRole?: string;
+    }) => d
+  )
+  .handler(async ({ data }) => {
+    const { removeSubdomain } = await import("./content-db.server");
+    const success = await removeSubdomain(data.subdomain, {
+      id: data.removerId,
+      email: data.removerEmail,
+      role: data.removerRole,
+    });
+    return { success };
+  });
+

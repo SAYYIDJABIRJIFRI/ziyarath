@@ -77,25 +77,31 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
  *    - /                    → 302 redirect to /maqam on the subdomain
  *    - /maqam/mampuram      → 301 normalize to /maqam
  *    - /uroos/mampuram-uroos → 301 normalize to /uroos
- *    - /maqam               → rewrites internally to /maqam/mampuram for SSR
- *    - /uroos               → rewrites internally to /uroos/mampuram-uroos for SSR
+import { SUBDOMAIN_REGISTRY, ROOT_DOMAIN } from "./lib/subdomain-config";
+import { ensureSubdomainsLoaded } from "./lib/content-db.server";
+
+/**
+ * Subdomain URL rewriting & 301 redirection.
+ *
+ * 1. Root domain (ziyarath.com):
+ *    - /maqam/{id}  → 301 redirect to https://{subdomain}.ziyarath.com/maqam
+ *    - /uroos/{id}  → 301 redirect to https://{subdomain}.ziyarath.com/uroos
+ *
+ * 2. Registered subdomain (e.g. mampuram.ziyarath.com):
+ *    - /            → 302 redirect to /maqam or /uroos on the subdomain
+ *    - /maqam/{id}  → 301 normalize to /maqam
+ *    - /uroos/{id}  → 301 normalize to /uroos
  */
 function rewriteForSubdomain(request: Request): Request | Response | null {
   const url = new URL(request.url);
-  const host = url.hostname;
+  const host = url.hostname.toLowerCase();
   const pathname = url.pathname;
-  const ROOT_DOMAIN = "ziyarath.com";
-
-  // Registry matching src/lib/subdomain-config.ts
-  const SUBDOMAIN_REGISTRY: Record<string, { maqamId: string; uroosId: string | null }> = {
-    mampuram: { maqamId: "mampuram", uroosId: "mampuram-uroos" },
-  };
 
   // Case 1: Main domain or www (e.g. ziyarath.com)
-  // 301 permanent redirect legacy paths to their dedicated subdomain
+  // 301 permanent redirect paths to their dedicated subdomain
   if (host === ROOT_DOMAIN || host === `www.${ROOT_DOMAIN}`) {
     for (const [sub, entry] of Object.entries(SUBDOMAIN_REGISTRY)) {
-      if (pathname === `/maqam/${entry.maqamId}` || pathname === `/maqam/${entry.maqamId}/`) {
+      if (entry.maqamId && (pathname === `/maqam/${entry.maqamId}` || pathname === `/maqam/${entry.maqamId}/`)) {
         return Response.redirect(`https://${sub}.${ROOT_DOMAIN}/maqam`, 301);
       }
       if (entry.uroosId && (pathname === `/uroos/${entry.uroosId}` || pathname === `/uroos/${entry.uroosId}/`)) {
@@ -106,22 +112,26 @@ function rewriteForSubdomain(request: Request): Request | Response | null {
   }
 
   // Case 2: Not on root domain — verify if subdomain
-  if (!host.endsWith(`.${ROOT_DOMAIN}`)) return null;
+  const isLocalhost = host.endsWith(".localhost");
+  if (!host.endsWith(`.${ROOT_DOMAIN}`) && !isLocalhost) return null;
 
-  const prefix = host.slice(0, -(ROOT_DOMAIN.length + 1));
+  const prefix = isLocalhost
+    ? host.slice(0, -".localhost".length)
+    : host.slice(0, -(ROOT_DOMAIN.length + 1));
+
   if (!prefix || prefix === "www") return null;
 
   const entry = SUBDOMAIN_REGISTRY[prefix];
   if (!entry) return null;
 
-  // Root on subdomain: redirect to /maqam
+  // Root on subdomain: redirect to /maqam (or /uroos if uroos-only target)
   if (pathname === "/" || pathname === "") {
-    url.pathname = "/maqam";
+    url.pathname = entry.maqamId ? "/maqam" : "/uroos";
     return Response.redirect(url.toString(), 302);
   }
 
   // If user visits /maqam/{id} on the subdomain, normalize to /maqam
-  if (pathname === `/maqam/${entry.maqamId}` || pathname === `/maqam/${entry.maqamId}/`) {
+  if (entry.maqamId && (pathname === `/maqam/${entry.maqamId}` || pathname === `/maqam/${entry.maqamId}/`)) {
     url.pathname = "/maqam";
     return Response.redirect(url.toString(), 301);
   }
@@ -143,7 +153,6 @@ function rewriteForSubdomain(request: Request): Request | Response | null {
   }
 
   // /maqam and /uroos routes are natively subdomain-aware in TanStack Start
-  // All other paths (static assets, API, etc.) pass through unchanged
   return null;
 }
 
@@ -152,6 +161,9 @@ export default {
     try {
       // Expose Cloudflare bindings (D1, KV, etc.) to server-only modules.
       (globalThis as { __CF_ENV__?: unknown }).__CF_ENV__ = env;
+
+      // Ensure D1 subdomains are synchronized into SUBDOMAIN_REGISTRY
+      await ensureSubdomainsLoaded();
 
       // --- Subdomain routing ---
       const rewritten = rewriteForSubdomain(request);
@@ -167,3 +179,4 @@ export default {
     }
   },
 };
+

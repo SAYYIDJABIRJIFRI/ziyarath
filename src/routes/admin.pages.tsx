@@ -58,7 +58,9 @@ import {
   updatePageContentFn,
   listAllotmentsFn,
 } from "@/lib/content.functions";
-import type { DbMaqam, DbUroos, PageAllotment } from "@/types/content";
+import { listSubdomainMappingsFn } from "@/lib/subdomain.functions";
+import { ROOT_DOMAIN } from "@/lib/subdomain-config";
+import type { DbMaqam, DbUroos, PageAllotment, SubdomainMapping } from "@/types/content";
 import { checkIsSuperAdmin } from "@/lib/auth-roles";
 
 // Bundled high-resolution assets for quick presets
@@ -137,6 +139,7 @@ function AdminPagesManagement() {
   const [maqams, setMaqams] = useState<DbMaqam[]>([]);
   const [uroosList, setUroosList] = useState<DbUroos[]>([]);
   const [allotments, setAllotments] = useState<PageAllotment[]>([]);
+  const [subdomains, setSubdomains] = useState<SubdomainMapping[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -158,23 +161,35 @@ function AdminPagesManagement() {
   const getPagesFn = useServerFn(getMyManagedPagesFn);
   const updatePageFn = useServerFn(updatePageContentFn);
   const listAllotFn = useServerFn(listAllotmentsFn);
+  const listSubdomainsFn = useServerFn(listSubdomainMappingsFn);
 
   const loadData = async (role = currentRole, email = currentUserEmail, uid = currentUserId) => {
     setLoading(true);
     try {
-      const [pagesRes, allotRes] = await Promise.all([
+      const [pagesRes, allotRes, subData] = await Promise.all([
         getPagesFn({ data: { userId: uid, userEmail: email, role } }),
         listAllotFn(),
+        listSubdomainsFn(),
       ]);
       setMaqams(pagesRes.allottedMaqams as DbMaqam[]);
       setUroosList(pagesRes.allottedUroos as DbUroos[]);
       setIsSuperAdmin(Boolean(pagesRes.isSuperAdmin));
       setAllotments(allotRes as PageAllotment[]);
+      setSubdomains(subData as SubdomainMapping[]);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load pages");
     } finally {
       setLoading(false);
     }
+  };
+
+  const getSubdomainFor = (type: "maqam" | "uroos", id: string) => {
+    return (
+      subdomains.find((s) => s.targetType === type && s.targetId === id) ||
+      (type === "maqam"
+        ? subdomains.find((s) => s.maqamId === id)
+        : subdomains.find((s) => s.uroosId === id))
+    );
   };
 
   const [authenticatedEmail, setAuthenticatedEmail] = useState<string | null>(null);
@@ -1048,19 +1063,48 @@ function AdminPagesManagement() {
                               </span>
                             </div>
                           )}
+
+                          {(() => {
+                            const subMapping = getSubdomainFor("maqam", m.id);
+                            if (!subMapping) return null;
+                            return (
+                              <div className="pt-1.5 flex items-center gap-1.5">
+                                <Badge className="bg-primary/10 text-primary border-primary/30 font-mono text-[10px] gap-1 px-1.5 py-0.5">
+                                  <Globe className="h-3 w-3 shrink-0" />
+                                  {subMapping.subdomain}.{ROOT_DOMAIN}
+                                </Badge>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         <div className="p-3 bg-muted/30 border-t border-border flex items-center justify-between gap-2">
-                          <Button
-                            asChild
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 text-xs text-muted-foreground hover:text-foreground"
-                          >
-                            <Link to="/maqam/$id" params={{ id: m.id }} target="_blank">
-                              <ExternalLink className="mr-1 h-3 w-3" /> Live
-                            </Link>
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              asChild
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 text-xs text-muted-foreground hover:text-foreground px-2"
+                            >
+                              <Link to="/maqam/$id" params={{ id: m.id }} target="_blank">
+                                <ExternalLink className="mr-1 h-3 w-3" /> Live
+                              </Link>
+                            </Button>
+                            {isSuperAdmin && (
+                              <Button
+                                asChild
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2 text-xs gap-1 text-primary hover:text-primary"
+                                title="Manage Subdomain in Super Admin Allotments"
+                              >
+                                <Link to="/admin/allotments">
+                                  <Globe className="h-3 w-3" />
+                                  <span className="hidden sm:inline">Subdomain</span>
+                                </Link>
+                              </Button>
+                            )}
+                          </div>
                           {isSuperAdmin || (allot && (allot.userEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim() || allot.userId === currentUserId)) ? (
                             <Button
                               size="sm"
@@ -1193,19 +1237,48 @@ function AdminPagesManagement() {
                               </span>
                             </div>
                           )}
+
+                          {(() => {
+                            const subMapping = getSubdomainFor("uroos", u.id);
+                            if (!subMapping) return null;
+                            return (
+                              <div className="pt-1.5 flex items-center gap-1.5">
+                                <Badge className="bg-primary/10 text-primary border-primary/30 font-mono text-[10px] gap-1 px-1.5 py-0.5">
+                                  <Globe className="h-3 w-3 shrink-0" />
+                                  {subMapping.subdomain}.{ROOT_DOMAIN}
+                                </Badge>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         <div className="p-3 bg-muted/30 border-t border-border flex items-center justify-between gap-2">
-                          <Button
-                            asChild
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 text-xs text-muted-foreground hover:text-foreground"
-                          >
-                            <Link to="/uroos/$id" params={{ id: u.id }} target="_blank">
-                              <ExternalLink className="mr-1 h-3 w-3" /> Live
-                            </Link>
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              asChild
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 text-xs text-muted-foreground hover:text-foreground px-2"
+                            >
+                              <Link to="/uroos/$id" params={{ id: u.id }} target="_blank">
+                                <ExternalLink className="mr-1 h-3 w-3" /> Live
+                              </Link>
+                            </Button>
+                            {isSuperAdmin && (
+                              <Button
+                                asChild
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2 text-xs gap-1 text-primary hover:text-primary"
+                                title="Manage Subdomain in Super Admin Allotments"
+                              >
+                                <Link to="/admin/allotments">
+                                  <Globe className="h-3 w-3" />
+                                  <span className="hidden sm:inline">Subdomain</span>
+                                </Link>
+                              </Button>
+                            )}
+                          </div>
                           {isSuperAdmin || (allot && (allot.userEmail.toLowerCase().trim() === currentUserEmail.toLowerCase().trim() || allot.userId === currentUserId)) ? (
                             <Button
                               size="sm"

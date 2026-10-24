@@ -72,3 +72,18 @@ export type SystemUser = {
   createdAt: string;
   allotmentCount?: number;
 };
+
+export type SubdomainMapping = {
+  subdomain: string;
+  targetType: "maqam" | "uroos";
+  targetId: string;
+  targetTitle: string;
+  maqamId: string | null;
+  uroosId: string | null;
+  notes?: string | null;
+  assignedBy: string;
+  assignedByEmail?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+

@@ -387,11 +387,11 @@ export function AdminProfileMenu({ className }: AdminProfileMenuProps) {
 
                 <DropdownMenuItem asChild>
                   <Link to="/admin/allotments" className="flex items-center gap-2 cursor-pointer text-xs py-2">
-                    <UserCheck className="h-4 w-4 text-blue-500" />
+                    <Globe className="h-4 w-4 text-primary" />
                     <div className="flex flex-col">
-                      <span className="font-medium text-foreground">Page Allotments</span>
+                      <span className="font-medium text-foreground">Allotments & Subdomains</span>
                       <span className="text-[10px] text-muted-foreground">
-                        Assign pages to designated admins
+                        Assign pages & dedicated subdomains
                       </span>
                     </div>
                   </Link>

@@ -282,7 +282,7 @@ function AdminHubPage() {
             </CardContent>
           </Card>
 
-          {/* Card 2: Super Admin Page Allotments */}
+          {/* Card 2: Super Admin Page Allotments & Subdomains */}
           <Card className="group flex flex-col justify-between border-border bg-card transition-all hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg">
             <CardHeader className="space-y-3 pb-4">
               <div className="flex items-center justify-between">
@@ -295,10 +295,10 @@ function AdminHubPage() {
               </div>
               <div>
                 <CardTitle className="font-display text-lg font-bold group-hover:text-primary transition-colors">
-                  Page Allotments
+                  Allotments & Subdomains
                 </CardTitle>
                 <CardDescription className="mt-1.5 text-xs leading-relaxed">
-                  Allot specific Maqam and Uroos pages to designated administrators. Revoke or reassign page management ownership anytime.
+                  Allot specific Maqam and Uroos pages to caretaker admins, and assign custom subdomains (e.g. madavoor.ziyarath.com) with automatic routing.
                 </CardDescription>
               </div>
             </CardHeader>
@@ -307,17 +307,17 @@ function AdminHubPage() {
               <div className="space-y-2 pt-2 border-t border-border/60 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1.5">
                   <ShieldCheck className="h-3.5 w-3.5 text-blue-600" />
-                  Super Admin role authority
+                  Super Admin governance & access control
                 </div>
                 <div className="flex items-center gap-1.5">
                   <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
-                  Direct email & admin assignment
+                  Direct email & admin page assignment
                 </div>
               </div>
 
               <Button asChild className="mt-5 w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
                 <Link to="/admin/allotments">
-                  Manage Allotments
+                  Manage Allotments & Subdomains
                   <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                 </Link>
               </Button>
