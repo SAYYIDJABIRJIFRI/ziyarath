@@ -47,7 +47,7 @@ export type NewRequestInput = Omit<
   | "updated_at"
 >;
 
-export type AuditAction = "approve" | "reject" | "delete";
+export type AuditAction = "approve" | "reject" | "delete" | "allot" | "revoke";
 
 export type AuditRow = {
   id: string;
@@ -119,46 +119,62 @@ let requestsSchemaInitialized = false;
 export async function ensureRequestsSchema(db: D1Database): Promise<void> {
   if (requestsSchemaInitialized) return;
   try {
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS requests (
-        id TEXT PRIMARY KEY,
-        type TEXT NOT NULL CHECK (type IN ('maqam', 'uroos')),
-        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-        name TEXT NOT NULL,
-        contact TEXT NOT NULL,
-        city TEXT,
-        country TEXT,
-        subject TEXT NOT NULL,
-        requested_date TEXT,
-        details TEXT NOT NULL,
-        supporting_notes TEXT,
-        review_notes TEXT,
-        reviewed_by TEXT,
-        reviewed_at TEXT,
-        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-      );
-      CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status);
-      CREATE INDEX IF NOT EXISTS idx_requests_type ON requests(type);
-      CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at DESC);
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS requests (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL CHECK (type IN ('maqam', 'uroos')),
+          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+          name TEXT NOT NULL,
+          contact TEXT NOT NULL,
+          city TEXT,
+          country TEXT,
+          subject TEXT NOT NULL,
+          requested_date TEXT,
+          details TEXT NOT NULL,
+          supporting_notes TEXT,
+          review_notes TEXT,
+          reviewed_by TEXT,
+          reviewed_at TEXT,
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        )`
+      )
+      .run();
 
-      CREATE TABLE IF NOT EXISTS audit_log (
-        id TEXT PRIMARY KEY,
-        action TEXT NOT NULL CHECK (action IN ('approve', 'reject', 'delete')),
-        request_id TEXT NOT NULL,
-        request_type TEXT,
-        request_subject TEXT,
-        actor_id TEXT NOT NULL,
-        actor_email TEXT,
-        notes TEXT,
-        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-      );
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS audit_log (
+          id TEXT PRIMARY KEY,
+          action TEXT NOT NULL CHECK (action IN ('approve', 'reject', 'delete', 'allot', 'revoke')),
+          request_id TEXT NOT NULL,
+          request_type TEXT,
+          request_subject TEXT,
+          actor_id TEXT NOT NULL,
+          actor_email TEXT,
+          notes TEXT,
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        )`
+      )
+      .run();
 
-      CREATE TABLE IF NOT EXISTS request_hits (
-        ip TEXT NOT NULL,
-        created_at INTEGER NOT NULL
-      );
-    `);
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS request_hits (
+          ip TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        )`
+      )
+      .run();
+
+    try {
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_requests_type ON requests(type)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at DESC)").run();
+    } catch {
+      // Index creation non-blocking
+    }
+
     requestsSchemaInitialized = true;
   } catch (err) {
     console.warn("[D1 Requests] Auto schema ensure note:", err);

@@ -104,92 +104,122 @@ let contentSchemaInitialized = false;
 export async function ensureContentSchema(db: any): Promise<void> {
   if (contentSchemaInitialized) return;
   try {
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS maqams (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        malayalam_name TEXT,
-        location TEXT NOT NULL,
-        city TEXT NOT NULL,
-        country TEXT NOT NULL DEFAULT 'India',
-        region TEXT NOT NULL DEFAULT 'kerala',
-        category TEXT NOT NULL DEFAULT 'scholar',
-        era TEXT,
-        description TEXT NOT NULL,
-        significance TEXT,
-        best_time_to_visit TEXT,
-        source_url TEXT,
-        cover_image TEXT,
-        address_detail TEXT,
-        visiting_hours TEXT,
-        facilities TEXT,
-        how_to_reach TEXT,
-        contact_info TEXT,
-        history TEXT,
-        architecture TEXT,
-        created_from_request_id TEXT,
-        status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'draft', 'archived')),
-        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-      );
+    // 1. page_allotments table
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS page_allotments (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          user_email TEXT NOT NULL,
+          target_type TEXT NOT NULL CHECK (target_type IN ('maqam', 'uroos')),
+          target_id TEXT NOT NULL,
+          target_title TEXT NOT NULL,
+          assigned_by TEXT NOT NULL,
+          assigned_by_email TEXT,
+          notes TEXT,
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          UNIQUE(user_id, target_type, target_id)
+        )`
+      )
+      .run();
 
-      CREATE TABLE IF NOT EXISTS uroos (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        malayalam_title TEXT,
-        maqam_id TEXT,
-        is_standalone INTEGER NOT NULL DEFAULT 0,
-        resting_person TEXT,
-        hijri_month INTEGER,
-        hijri_month_name TEXT,
-        hijri_day INTEGER,
-        gregorian_date TEXT,
-        recurrence TEXT,
-        venue_name TEXT,
-        city TEXT,
-        state TEXT DEFAULT 'Kerala',
-        country TEXT DEFAULT 'India',
-        description TEXT NOT NULL,
-        history TEXT,
-        significance TEXT,
-        program_schedule TEXT,
-        nercha_offerings TEXT,
-        how_to_reach TEXT,
-        organizer_name TEXT,
-        organizer_contact TEXT,
-        cover_image TEXT,
-        source_url TEXT,
-        created_from_request_id TEXT,
-        status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'draft', 'archived')),
-        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-        FOREIGN KEY (maqam_id) REFERENCES maqams(id) ON DELETE SET NULL
-      );
+    // 2. system_roles table
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS system_roles (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL UNIQUE,
+          user_email TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'admin' CHECK (role IN ('super_admin', 'admin', 'user')),
+          display_name TEXT,
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        )`
+      )
+      .run();
 
-      CREATE TABLE IF NOT EXISTS page_allotments (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        user_email TEXT NOT NULL,
-        target_type TEXT NOT NULL CHECK (target_type IN ('maqam', 'uroos')),
-        target_id TEXT NOT NULL,
-        target_title TEXT NOT NULL,
-        assigned_by TEXT NOT NULL,
-        assigned_by_email TEXT,
-        notes TEXT,
-        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-        UNIQUE(user_id, target_type, target_id)
-      );
+    // 3. maqams table
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS maqams (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          malayalam_name TEXT,
+          location TEXT NOT NULL,
+          city TEXT NOT NULL,
+          country TEXT NOT NULL DEFAULT 'India',
+          region TEXT NOT NULL DEFAULT 'kerala',
+          category TEXT NOT NULL DEFAULT 'scholar',
+          era TEXT,
+          description TEXT NOT NULL,
+          significance TEXT,
+          best_time_to_visit TEXT,
+          source_url TEXT,
+          cover_image TEXT,
+          address_detail TEXT,
+          visiting_hours TEXT,
+          facilities TEXT,
+          how_to_reach TEXT,
+          contact_info TEXT,
+          history TEXT,
+          architecture TEXT,
+          created_from_request_id TEXT,
+          status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'draft', 'archived')),
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        )`
+      )
+      .run();
 
-      CREATE TABLE IF NOT EXISTS system_roles (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL UNIQUE,
-        user_email TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'admin' CHECK (role IN ('super_admin', 'admin', 'user')),
-        display_name TEXT,
-        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-      );
-    `);
+    // 4. uroos table
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS uroos (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          malayalam_title TEXT,
+          maqam_id TEXT,
+          is_standalone INTEGER NOT NULL DEFAULT 0,
+          resting_person TEXT,
+          hijri_month INTEGER,
+          hijri_month_name TEXT,
+          hijri_day INTEGER,
+          gregorian_date TEXT,
+          recurrence TEXT,
+          venue_name TEXT,
+          city TEXT,
+          state TEXT DEFAULT 'Kerala',
+          country TEXT DEFAULT 'India',
+          description TEXT NOT NULL,
+          history TEXT,
+          significance TEXT,
+          program_schedule TEXT,
+          nercha_offerings TEXT,
+          how_to_reach TEXT,
+          organizer_name TEXT,
+          organizer_contact TEXT,
+          cover_image TEXT,
+          source_url TEXT,
+          created_from_request_id TEXT,
+          status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'draft', 'archived')),
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          FOREIGN KEY (maqam_id) REFERENCES maqams(id) ON DELETE SET NULL
+        )`
+      )
+      .run();
+
+    // Indices
+    try {
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_allotments_user ON page_allotments(user_id)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_allotments_target ON page_allotments(target_type, target_id)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_system_roles_user ON system_roles(user_id)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_maqams_region ON maqams(region)").run();
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_uroos_maqam_id ON uroos(maqam_id)").run();
+    } catch {
+      // Non-fatal
+    }
+
     contentSchemaInitialized = true;
   } catch (err) {
     console.warn("[D1 Content] Auto schema note:", err);
@@ -626,11 +656,12 @@ export async function updateUroos(id: string, partial: Partial<DbUroos>): Promis
 export async function listAllotments(): Promise<PageAllotment[]> {
   const db = getDB();
   if (db) {
+    const fetchRows = () =>
+      db.prepare("SELECT * FROM page_allotments ORDER BY created_at DESC").all<Record<string, unknown>>();
+
     try {
       await ensureContentSchema(db);
-      const { results } = await db
-        .prepare("SELECT * FROM page_allotments ORDER BY created_at DESC")
-        .all<Record<string, unknown>>();
+      const { results } = await fetchRows();
       if (results && results.length > 0) {
         const d1Allots: PageAllotment[] = results.map((r) => ({
           id: String(r.id),
@@ -657,8 +688,43 @@ export async function listAllotments(): Promise<PageAllotment[]> {
         }
         return Array.from(map.values());
       }
-    } catch (err) {
-      console.warn("[D1 Content] listAllotments error:", err);
+    } catch (err: any) {
+      if (String(err?.message || err).includes("no such table")) {
+        try {
+          contentSchemaInitialized = false;
+          await ensureContentSchema(db);
+          const { results } = await fetchRows();
+          if (results && results.length > 0) {
+            const d1Allots: PageAllotment[] = results.map((r) => ({
+              id: String(r.id),
+              userId: String(r.user_id),
+              userEmail: String(r.user_email),
+              targetType: (r.target_type as any) || "maqam",
+              targetId: String(r.target_id),
+              targetTitle: String(r.target_title),
+              assignedBy: String(r.assigned_by),
+              assignedByEmail: r.assigned_by_email ? String(r.assigned_by_email) : null,
+              notes: r.notes ? String(r.notes) : null,
+              createdAt: String(r.created_at),
+              updatedAt: String(r.updated_at),
+            }));
+            const map = new Map<string, PageAllotment>();
+            for (const a of memoryAllotments) {
+              const key = `${a.userEmail.toLowerCase()}_${a.targetType}_${a.targetId}`;
+              map.set(key, a);
+            }
+            for (const a of d1Allots) {
+              const key = `${a.userEmail.toLowerCase()}_${a.targetType}_${a.targetId}`;
+              map.set(key, a);
+            }
+            return Array.from(map.values());
+          }
+        } catch (retryErr) {
+          console.warn("[D1 Content] listAllotments retry error:", retryErr);
+        }
+      } else {
+        console.warn("[D1 Content] listAllotments error:", err);
+      }
     }
   }
   return [...memoryAllotments];
@@ -692,9 +758,8 @@ export async function createAllotment(input: {
 
   const db = getDB();
   if (db) {
-    try {
-      await ensureContentSchema(db);
-      await db
+    const runInsert = () =>
+      db
         .prepare(
           `INSERT INTO page_allotments
             (id, user_id, user_email, target_type, target_id, target_title, assigned_by, assigned_by_email, notes, created_at, updated_at)
@@ -719,8 +784,22 @@ export async function createAllotment(input: {
           allotment.updatedAt
         )
         .run();
-    } catch (err) {
-      console.warn("[D1 Content] createAllotment error:", err);
+
+    try {
+      await ensureContentSchema(db);
+      await runInsert();
+    } catch (err: any) {
+      if (String(err?.message || err).includes("no such table")) {
+        try {
+          contentSchemaInitialized = false;
+          await ensureContentSchema(db);
+          await runInsert();
+        } catch (retryErr) {
+          console.warn("[D1 Content] createAllotment retry error:", retryErr);
+        }
+      } else {
+        console.warn("[D1 Content] createAllotment error:", err);
+      }
     }
   }
 
@@ -764,8 +843,18 @@ export async function revokeAllotment(
     try {
       await ensureContentSchema(db);
       await db.prepare("DELETE FROM page_allotments WHERE id = ?").bind(id).run();
-    } catch (err) {
-      console.warn("[D1 Content] revokeAllotment error:", err);
+    } catch (err: any) {
+      if (String(err?.message || err).includes("no such table")) {
+        try {
+          contentSchemaInitialized = false;
+          await ensureContentSchema(db);
+          await db.prepare("DELETE FROM page_allotments WHERE id = ?").bind(id).run();
+        } catch (retryErr) {
+          console.warn("[D1 Content] revokeAllotment retry error:", retryErr);
+        }
+      } else {
+        console.warn("[D1 Content] revokeAllotment error:", err);
+      }
     }
   }
   const prevLen = memoryAllotments.length;
