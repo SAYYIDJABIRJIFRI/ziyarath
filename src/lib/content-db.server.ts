@@ -275,6 +275,7 @@ export async function createMaqam(input: Omit<DbMaqam, "createdAt" | "updatedAt"
   const db = getDB();
   if (db) {
     try {
+      await ensureContentSchema(db);
       await db
         .prepare(
           `INSERT INTO maqams (
@@ -487,6 +488,7 @@ export async function createUroos(input: Omit<DbUroos, "createdAt" | "updatedAt"
   const db = getDB();
   if (db) {
     try {
+      await ensureContentSchema(db);
       await db
         .prepare(
           `INSERT INTO uroos (
