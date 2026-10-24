@@ -13,7 +13,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "seo:check": "node scripts/seo-check.mjs",
-    "seo:check:api": "node scripts/seo-check.mjs --via-api"
+    "seo:check:api": "node scripts/seo-check.mjs --via-api",
+    "d1:seed": "node scripts/export-seed-sql.mjs && wrangler d1 execute ziyarath-requests --remote --file=migrations/0005_seed_all_content.sql",
+    "d1:seed:local": "node scripts/export-seed-sql.mjs && wrangler d1 execute ziyarath-requests --local --file=migrations/0005_seed_all_content.sql"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",

@@ -220,9 +220,149 @@ export async function ensureContentSchema(db: any): Promise<void> {
       // Non-fatal
     }
 
+    // Automatically seed all existing pages into D1 (ON CONFLICT DO NOTHING preserves any existing edits)
+    await seedMissingPagesToD1(db);
+
     contentSchemaInitialized = true;
   } catch (err) {
     console.warn("[D1 Content] Auto schema note:", err);
+  }
+}
+
+let contentSeeded = false;
+
+export async function seedMissingPagesToD1(db: any): Promise<void> {
+  if (contentSeeded) return;
+  try {
+    // 1. Seed seedMaqams with ON CONFLICT(id) DO NOTHING
+    const insertMaqamStmt = db.prepare(`
+      INSERT INTO maqams (
+        id, name, malayalam_name, location, city, country, region, category, era,
+        description, significance, best_time_to_visit, source_url, cover_image,
+        address_detail, visiting_hours, facilities, how_to_reach, contact_info,
+        history, architecture, created_from_request_id, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO NOTHING
+    `);
+
+    for (const m of seedMaqams) {
+      await insertMaqamStmt
+        .bind(
+          m.id,
+          m.name,
+          m.malayalamName || null,
+          m.location,
+          m.city,
+          m.country || "India",
+          m.region || "kerala",
+          m.category || "scholar",
+          m.era || null,
+          m.description || "",
+          m.significance || null,
+          m.bestTimeToVisit || null,
+          m.sourceUrl || null,
+          m.coverImage || null,
+          m.addressDetail || null,
+          m.visitingHours ? JSON.stringify(m.visitingHours) : null,
+          m.facilities ? JSON.stringify(m.facilities) : null,
+          m.howToReach ? JSON.stringify(m.howToReach) : null,
+          m.contactInfo ? JSON.stringify(m.contactInfo) : null,
+          m.history || null,
+          m.architecture || null,
+          m.createdFromRequestId || null,
+          m.status || "published",
+          m.createdAt || "2026-01-01T00:00:00.000Z",
+          m.updatedAt || "2026-01-01T00:00:00.000Z"
+        )
+        .run();
+    }
+
+    // 2. Seed seedUroos with ON CONFLICT(id) DO NOTHING
+    const insertUroosStmt = db.prepare(`
+      INSERT INTO uroos (
+        id, title, malayalam_title, maqam_id, is_standalone, resting_person,
+        hijri_month, hijri_month_name, hijri_day, gregorian_date, recurrence,
+        venue_name, city, state, country, description, history, significance,
+        program_schedule, nercha_offerings, how_to_reach, organizer_name,
+        organizer_contact, cover_image, source_url, created_from_request_id,
+        status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO NOTHING
+    `);
+
+    for (const u of seedUroos) {
+      await insertUroosStmt
+        .bind(
+          u.id,
+          u.title,
+          u.malayalamTitle || null,
+          u.maqamId || null,
+          u.isStandalone ? 1 : 0,
+          u.restingPerson || null,
+          u.hijriMonth || 1,
+          u.hijriMonthName || "",
+          u.hijriDay || 1,
+          u.gregorianDate || null,
+          u.recurrence || null,
+          u.venueName || null,
+          u.city || "",
+          u.state || "Kerala",
+          u.country || "India",
+          u.description || "",
+          u.history || null,
+          u.significance || null,
+          u.programSchedule ? JSON.stringify(u.programSchedule) : null,
+          u.nerchaOfferings || null,
+          u.howToReach ? JSON.stringify(u.howToReach) : null,
+          u.organizerName || null,
+          u.organizerContact || null,
+          u.coverImage || null,
+          u.sourceUrl || null,
+          u.createdFromRequestId || null,
+          u.status || "published",
+          u.createdAt || "2026-01-01T00:00:00.000Z",
+          u.updatedAt || "2026-01-01T00:00:00.000Z"
+        )
+        .run();
+    }
+
+    // 3. Seed system_roles with ON CONFLICT(user_id) DO NOTHING
+    const insertRoleStmt = db.prepare(`
+      INSERT INTO system_roles (id, user_id, user_email, role, display_name, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id) DO NOTHING
+    `);
+    for (const u of seedUsers) {
+      await insertRoleStmt.bind(u.id, u.userId, u.userEmail, u.role, u.displayName, u.createdAt).run();
+    }
+
+    // 4. Seed initial page_allotments with ON CONFLICT(user_id, target_type, target_id) DO NOTHING
+    const insertAllotStmt = db.prepare(`
+      INSERT INTO page_allotments (id, user_id, user_email, target_type, target_id, target_title, assigned_by, assigned_by_email, notes, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, target_type, target_id) DO NOTHING
+    `);
+    for (const a of seedAllotments) {
+      await insertAllotStmt
+        .bind(
+          a.id,
+          a.userId,
+          a.userEmail,
+          a.targetType,
+          a.targetId,
+          a.targetTitle,
+          a.assignedBy,
+          a.assignedByEmail,
+          a.notes,
+          a.createdAt,
+          a.updatedAt
+        )
+        .run();
+    }
+
+    contentSeeded = true;
+  } catch (err) {
+    console.warn("[D1 Content] seedMissingPagesToD1 note:", err);
   }
 }
 
