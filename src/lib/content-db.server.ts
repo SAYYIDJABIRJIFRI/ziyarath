@@ -313,7 +313,30 @@ export async function createMaqam(input: Omit<DbMaqam, "createdAt" | "updatedAt"
             description, significance, best_time_to_visit, source_url, cover_image,
             address_detail, visiting_hours, facilities, how_to_reach, contact_info,
             history, architecture, created_from_request_id, status, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            malayalam_name = excluded.malayalam_name,
+            location = excluded.location,
+            city = excluded.city,
+            country = excluded.country,
+            region = excluded.region,
+            category = excluded.category,
+            era = excluded.era,
+            description = excluded.description,
+            significance = excluded.significance,
+            best_time_to_visit = excluded.best_time_to_visit,
+            source_url = excluded.source_url,
+            cover_image = excluded.cover_image,
+            address_detail = excluded.address_detail,
+            visiting_hours = excluded.visiting_hours,
+            facilities = excluded.facilities,
+            how_to_reach = excluded.how_to_reach,
+            contact_info = excluded.contact_info,
+            history = excluded.history,
+            architecture = excluded.architecture,
+            status = excluded.status,
+            updated_at = excluded.updated_at`
         )
         .bind(
           item.id,
@@ -343,8 +366,8 @@ export async function createMaqam(input: Omit<DbMaqam, "createdAt" | "updatedAt"
           item.updatedAt
         )
         .run();
-    } catch {
-      // Continue with in-memory persistence
+    } catch (err) {
+      console.warn("[D1 Content] createMaqam error:", err);
     }
   }
 
@@ -386,14 +409,38 @@ export async function updateMaqam(id: string, partial: Partial<DbMaqam>): Promis
       await ensureContentSchema(db);
       await db
         .prepare(
-          `UPDATE maqams SET
-            name = ?, malayalam_name = ?, location = ?, city = ?, country = ?, region = ?, category = ?,
-            era = ?, description = ?, significance = ?, best_time_to_visit = ?, address_detail = ?,
-            visiting_hours = ?, facilities = ?, how_to_reach = ?, contact_info = ?, history = ?,
-            architecture = ?, cover_image = ?, source_url = ?, status = ?, updated_at = ?
-           WHERE id = ?`
+          `INSERT INTO maqams (
+            id, name, malayalam_name, location, city, country, region, category, era,
+            description, significance, best_time_to_visit, source_url, cover_image,
+            address_detail, visiting_hours, facilities, how_to_reach, contact_info,
+            history, architecture, created_from_request_id, status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            malayalam_name = excluded.malayalam_name,
+            location = excluded.location,
+            city = excluded.city,
+            country = excluded.country,
+            region = excluded.region,
+            category = excluded.category,
+            era = excluded.era,
+            description = excluded.description,
+            significance = excluded.significance,
+            best_time_to_visit = excluded.best_time_to_visit,
+            source_url = excluded.source_url,
+            cover_image = excluded.cover_image,
+            address_detail = excluded.address_detail,
+            visiting_hours = excluded.visiting_hours,
+            facilities = excluded.facilities,
+            how_to_reach = excluded.how_to_reach,
+            contact_info = excluded.contact_info,
+            history = excluded.history,
+            architecture = excluded.architecture,
+            status = excluded.status,
+            updated_at = excluded.updated_at`
         )
         .bind(
+          updated.id,
           updated.name,
           updated.malayalamName || null,
           updated.location,
@@ -405,6 +452,8 @@ export async function updateMaqam(id: string, partial: Partial<DbMaqam>): Promis
           updated.description,
           updated.significance || null,
           updated.bestTimeToVisit || null,
+          updated.sourceUrl || null,
+          updated.coverImage || null,
           updated.addressDetail || null,
           updated.visitingHours ? JSON.stringify(updated.visitingHours) : null,
           updated.facilities ? JSON.stringify(updated.facilities) : null,
@@ -412,11 +461,10 @@ export async function updateMaqam(id: string, partial: Partial<DbMaqam>): Promis
           updated.contactInfo ? JSON.stringify(updated.contactInfo) : null,
           updated.history || null,
           updated.architecture || null,
-          updated.coverImage || null,
-          updated.sourceUrl || null,
+          updated.createdFromRequestId || null,
           updated.status || "published",
-          now,
-          id
+          updated.createdAt || now,
+          now
         )
         .run();
     } catch (err) {
@@ -528,7 +576,34 @@ export async function createUroos(input: Omit<DbUroos, "createdAt" | "updatedAt"
             program_schedule, nercha_offerings, how_to_reach, organizer_name,
             organizer_contact, cover_image, source_url, created_from_request_id,
             status, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            title = excluded.title,
+            malayalam_title = excluded.malayalam_title,
+            maqam_id = excluded.maqam_id,
+            is_standalone = excluded.is_standalone,
+            resting_person = excluded.resting_person,
+            hijri_month = excluded.hijri_month,
+            hijri_month_name = excluded.hijri_month_name,
+            hijri_day = excluded.hijri_day,
+            gregorian_date = excluded.gregorian_date,
+            recurrence = excluded.recurrence,
+            venue_name = excluded.venue_name,
+            city = excluded.city,
+            state = excluded.state,
+            country = excluded.country,
+            description = excluded.description,
+            history = excluded.history,
+            significance = excluded.significance,
+            program_schedule = excluded.program_schedule,
+            nercha_offerings = excluded.nercha_offerings,
+            how_to_reach = excluded.how_to_reach,
+            organizer_name = excluded.organizer_name,
+            organizer_contact = excluded.organizer_contact,
+            cover_image = excluded.cover_image,
+            source_url = excluded.source_url,
+            status = excluded.status,
+            updated_at = excluded.updated_at`
         )
         .bind(
           item.id,
@@ -562,8 +637,8 @@ export async function createUroos(input: Omit<DbUroos, "createdAt" | "updatedAt"
           item.updatedAt
         )
         .run();
-    } catch {
-      // In-memory fallback
+    } catch (err) {
+      console.warn("[D1 Content] createUroos error:", err);
     }
   }
 
@@ -604,15 +679,44 @@ export async function updateUroos(id: string, partial: Partial<DbUroos>): Promis
       await ensureContentSchema(db);
       await db
         .prepare(
-          `UPDATE uroos SET
-            title = ?, malayalam_title = ?, maqam_id = ?, is_standalone = ?, resting_person = ?,
-            hijri_month = ?, hijri_month_name = ?, hijri_day = ?, gregorian_date = ?, recurrence = ?,
-            venue_name = ?, city = ?, state = ?, country = ?, description = ?, history = ?,
-            significance = ?, program_schedule = ?, nercha_offerings = ?, how_to_reach = ?,
-            organizer_name = ?, organizer_contact = ?, cover_image = ?, source_url = ?, status = ?, updated_at = ?
-           WHERE id = ?`
+          `INSERT INTO uroos (
+            id, title, malayalam_title, maqam_id, is_standalone, resting_person,
+            hijri_month, hijri_month_name, hijri_day, gregorian_date, recurrence,
+            venue_name, city, state, country, description, history, significance,
+            program_schedule, nercha_offerings, how_to_reach, organizer_name,
+            organizer_contact, cover_image, source_url, created_from_request_id,
+            status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            title = excluded.title,
+            malayalam_title = excluded.malayalam_title,
+            maqam_id = excluded.maqam_id,
+            is_standalone = excluded.is_standalone,
+            resting_person = excluded.resting_person,
+            hijri_month = excluded.hijri_month,
+            hijri_month_name = excluded.hijri_month_name,
+            hijri_day = excluded.hijri_day,
+            gregorian_date = excluded.gregorian_date,
+            recurrence = excluded.recurrence,
+            venue_name = excluded.venue_name,
+            city = excluded.city,
+            state = excluded.state,
+            country = excluded.country,
+            description = excluded.description,
+            history = excluded.history,
+            significance = excluded.significance,
+            program_schedule = excluded.program_schedule,
+            nercha_offerings = excluded.nercha_offerings,
+            how_to_reach = excluded.how_to_reach,
+            organizer_name = excluded.organizer_name,
+            organizer_contact = excluded.organizer_contact,
+            cover_image = excluded.cover_image,
+            source_url = excluded.source_url,
+            status = excluded.status,
+            updated_at = excluded.updated_at`
         )
         .bind(
+          updated.id,
           updated.title,
           updated.malayalamTitle || null,
           updated.maqamId || null,
@@ -637,9 +741,10 @@ export async function updateUroos(id: string, partial: Partial<DbUroos>): Promis
           updated.organizerContact || null,
           updated.coverImage || null,
           updated.sourceUrl || null,
+          updated.createdFromRequestId || null,
           updated.status || "published",
-          now,
-          id
+          updated.createdAt || now,
+          now
         )
         .run();
     } catch (err) {
