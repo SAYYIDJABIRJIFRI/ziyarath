@@ -177,6 +177,22 @@ const migrationPath = resolve("migrations/0005_seed_all_content.sql");
 await writeFile(migrationPath, finalSql, "utf-8");
 console.log("Written migration to:", migrationPath);
 
+// Generate comment-free files for direct pasting into Cloudflare D1 Dashboard Console
+const cleanStatements = lines.filter((l) => l.trim().length > 0 && !l.trim().startsWith("--")).join("\n");
+await writeFile(resolve("migrations/0005_seed_all_content_clean.sql"), cleanStatements + "\n", "utf-8");
+
+// Generate clean separated files
+const roleStatements = users.map(u => `INSERT OR IGNORE INTO system_roles (id, user_id, user_email, role, display_name, created_at) VALUES (${sqlVal(u.id)}, ${sqlVal(u.userId)}, ${sqlVal(u.userEmail)}, ${sqlVal(u.role)}, ${sqlVal(u.displayName)}, ${sqlVal(u.createdAt)});`).join("\n");
+const allotStatements = allotments.map(a => `INSERT OR IGNORE INTO page_allotments (id, user_id, user_email, target_type, target_id, target_title, assigned_by, assigned_by_email, notes, created_at, updated_at) VALUES (${sqlVal(a.id)}, ${sqlVal(a.userId)}, ${sqlVal(a.userEmail)}, ${sqlVal(a.targetType)}, ${sqlVal(a.targetId)}, ${sqlVal(a.targetTitle)}, ${sqlVal(a.assignedBy)}, ${sqlVal(a.assignedByEmail)}, ${sqlVal(a.notes)}, ${sqlVal(a.createdAt || "2026-01-01T00:00:00.000Z")}, ${sqlVal(a.updatedAt || "2026-01-01T00:00:00.000Z")});`).join("\n");
+
+await writeFile(resolve("migrations/clean_seed_roles_and_allotments.sql"), roleStatements + "\n" + allotStatements + "\n", "utf-8");
+
+const maqamStatements = lines.filter(l => l.startsWith("INSERT OR IGNORE INTO maqams")).join("\n");
+await writeFile(resolve("migrations/clean_seed_maqams.sql"), maqamStatements + "\n", "utf-8");
+
+const uroosStatements = lines.filter(l => l.startsWith("INSERT OR IGNORE INTO uroos")).join("\n");
+await writeFile(resolve("migrations/clean_seed_uroos.sql"), uroosStatements + "\n", "utf-8");
+
 // Verify with node:sqlite
 console.log("Verifying migration syntax in SQLite...");
 const testDb = new DatabaseSync(":memory:");
@@ -194,3 +210,4 @@ console.log(`- Uroos: ${uroosCount.count}`);
 console.log(`- Users: ${userCount.count}`);
 console.log(`- Allotments: ${allotCount.count}`);
 console.log("✓ Migration 0005 verified successfully with 0 errors!");
+
