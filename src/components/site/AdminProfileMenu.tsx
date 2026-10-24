@@ -38,6 +38,7 @@ import {
   Sparkles,
   Shield,
   Key,
+  Globe,
 } from "lucide-react";
 import { toast } from "sonner";
 

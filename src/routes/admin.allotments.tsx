@@ -697,12 +697,13 @@ function AdminAllotmentsPage() {
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <Button asChild variant="outline" size="sm" className="h-8 px-2 text-xs">
-                                <Link
-                                  to={allotment.targetType === "maqam" ? `/maqam/${allotment.targetId}` : `/uroos/${allotment.targetId}`}
+                                <a
+                                  href={allotment.targetType === "maqam" ? `/maqam/${allotment.targetId}` : `/uroos/${allotment.targetId}`}
                                   target="_blank"
+                                  rel="noopener noreferrer"
                                 >
                                   <ExternalLink className="h-3 w-3" />
-                                </Link>
+                                </a>
                               </Button>
                               <Button
                                 variant="ghost"

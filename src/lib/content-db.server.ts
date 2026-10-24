@@ -12,6 +12,23 @@ import { ALL_DEDICATED_UROOS } from "@/data/uroos-pages";
 import { checkIsSuperAdmin } from "./auth-roles";
 import { syncSubdomainRegistry, type SubdomainEntry } from "./subdomain-config";
 
+function safeJsonParse<T = unknown>(val: unknown): T | undefined {
+  if (!val) return undefined;
+  if (typeof val === "object") return val as T;
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+      return undefined;
+    }
+    try {
+      return JSON.parse(trimmed) as T;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 // -------------------------------------------------------------
 // Seed In-Memory Store
 // -------------------------------------------------------------
@@ -246,6 +263,26 @@ export async function ensureContentSchema(db: any): Promise<void> {
       )
       .run();
 
+    // Ensure all columns exist on subdomain_mappings even if an alternate seed schema was executed
+    try {
+      await db.prepare("ALTER TABLE subdomain_mappings ADD COLUMN target_title TEXT").run();
+    } catch { /* Column might already exist */ }
+    try {
+      await db.prepare("ALTER TABLE subdomain_mappings ADD COLUMN assigned_by TEXT").run();
+    } catch { /* Column might already exist */ }
+    try {
+      await db.prepare("ALTER TABLE subdomain_mappings ADD COLUMN assigned_by_email TEXT").run();
+    } catch { /* Column might already exist */ }
+    try {
+      await db.prepare("ALTER TABLE subdomain_mappings ADD COLUMN maqam_id TEXT").run();
+    } catch { /* Column might already exist */ }
+    try {
+      await db.prepare("ALTER TABLE subdomain_mappings ADD COLUMN uroos_id TEXT").run();
+    } catch { /* Column might already exist */ }
+    try {
+      await db.prepare("ALTER TABLE subdomain_mappings ADD COLUMN notes TEXT").run();
+    } catch { /* Column might already exist */ }
+
     // Indices
     try {
       await db.prepare("CREATE INDEX IF NOT EXISTS idx_allotments_user ON page_allotments(user_id)").run();
@@ -458,10 +495,10 @@ export async function listMaqams(includeAllStatuses = false): Promise<DbMaqam[]>
           sourceUrl: r.source_url ? String(r.source_url) : undefined,
           coverImage: r.cover_image ? String(r.cover_image) : undefined,
           addressDetail: r.address_detail ? String(r.address_detail) : undefined,
-          visitingHours: r.visiting_hours ? JSON.parse(String(r.visiting_hours)) : undefined,
-          facilities: r.facilities ? JSON.parse(String(r.facilities)) : undefined,
-          howToReach: r.how_to_reach ? JSON.parse(String(r.how_to_reach)) : undefined,
-          contactInfo: r.contact_info ? JSON.parse(String(r.contact_info)) : undefined,
+          visitingHours: safeJsonParse(r.visiting_hours),
+          facilities: safeJsonParse(r.facilities),
+          howToReach: safeJsonParse(r.how_to_reach),
+          contactInfo: safeJsonParse(r.contact_info),
           history: r.history ? String(r.history) : undefined,
           architecture: r.architecture ? String(r.architecture) : undefined,
           createdFromRequestId: r.created_from_request_id ? String(r.created_from_request_id) : null,
@@ -711,9 +748,9 @@ export async function listUroos(includeAllStatuses = false): Promise<DbUroos[]> 
           description: String(r.description || ""),
           history: r.history ? String(r.history) : undefined,
           significance: r.significance ? String(r.significance) : undefined,
-          programSchedule: r.program_schedule ? JSON.parse(String(r.program_schedule)) : undefined,
+          programSchedule: safeJsonParse(r.program_schedule),
           nerchaOfferings: r.nercha_offerings ? String(r.nercha_offerings) : undefined,
-          howToReach: r.how_to_reach ? JSON.parse(String(r.how_to_reach)) : undefined,
+          howToReach: safeJsonParse(r.how_to_reach),
           organizerName: r.organizer_name ? String(r.organizer_name) : undefined,
           organizerContact: r.organizer_contact ? String(r.organizer_contact) : undefined,
           coverImage: r.cover_image ? String(r.cover_image) : undefined,
@@ -1554,12 +1591,16 @@ export async function listSubdomainMappings(): Promise<SubdomainMapping[]> {
           subdomain: String(r.subdomain),
           targetType: (r.target_type as "maqam" | "uroos") || "maqam",
           targetId: String(r.target_id),
-          targetTitle: String(r.target_title || r.target_id),
+          targetTitle: String(r.target_title || r.title || r.target_id),
           maqamId: r.maqam_id ? String(r.maqam_id) : null,
           uroosId: r.uroos_id ? String(r.uroos_id) : null,
           notes: r.notes ? String(r.notes) : null,
-          assignedBy: String(r.assigned_by || "super_admin"),
-          assignedByEmail: r.assigned_by_email ? String(r.assigned_by_email) : null,
+          assignedBy: String(r.assigned_by || r.created_by_email || "super_admin"),
+          assignedByEmail: r.assigned_by_email
+            ? String(r.assigned_by_email)
+            : r.created_by_email
+              ? String(r.created_by_email)
+              : null,
           createdAt: String(r.created_at || "2026-01-01T00:00:00.000Z"),
           updatedAt: String(r.updated_at || "2026-01-01T00:00:00.000Z"),
         }));

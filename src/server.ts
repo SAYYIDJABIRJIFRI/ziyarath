@@ -66,17 +66,6 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   return brandedErrorResponse();
 }
 
-/**
- * Subdomain URL rewriting & 301 redirection.
- *
- * 1. Root domain (ziyarath.com):
- *    - /maqam/mampuram      → 301 redirect to https://mampuram.ziyarath.com/maqam
- *    - /uroos/mampuram-uroos → 301 redirect to https://mampuram.ziyarath.com/uroos
- *
- * 2. Registered subdomain (e.g. mampuram.ziyarath.com):
- *    - /                    → 302 redirect to /maqam on the subdomain
- *    - /maqam/mampuram      → 301 normalize to /maqam
- *    - /uroos/mampuram-uroos → 301 normalize to /uroos
 import { SUBDOMAIN_REGISTRY, ROOT_DOMAIN } from "./lib/subdomain-config";
 import { ensureSubdomainsLoaded } from "./lib/content-db.server";
 
@@ -163,10 +152,19 @@ export default {
       (globalThis as { __CF_ENV__?: unknown }).__CF_ENV__ = env;
 
       // Ensure D1 subdomains are synchronized into SUBDOMAIN_REGISTRY
-      await ensureSubdomainsLoaded();
+      try {
+        await ensureSubdomainsLoaded();
+      } catch (err) {
+        console.warn("[Server] ensureSubdomainsLoaded warning:", err);
+      }
 
       // --- Subdomain routing ---
-      const rewritten = rewriteForSubdomain(request);
+      let rewritten: Request | Response | null = null;
+      try {
+        rewritten = rewriteForSubdomain(request);
+      } catch (err) {
+        console.warn("[Server] Subdomain rewrite warning:", err);
+      }
       if (rewritten instanceof Response) return rewritten; // redirect
       const effectiveRequest = rewritten ?? request;
 
